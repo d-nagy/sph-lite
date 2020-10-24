@@ -4,6 +4,8 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <string>
+#include <iomanip>
 
 #define coordOffsetsIndex(row, col, dim) ((dim*row) + col)
 
@@ -12,15 +14,17 @@ using namespace std;
 const int DIM = 2;
 const double cubicKernelWNormalFactors[3] = {2.0/3.0, 10.0/(7*M_PI), 1/M_PI};
 
-unsigned int numParticles;
-double t, tFinal, tPlot, deltaT, deltaTPlot;
 double minPosition[DIM], maxPosition[DIM];
 int gridDims[DIM], dimFactors[DIM];
+int neighbourhoodSize = pow(3, DIM);
+
+unsigned int numParticles;
+double t, tFinal, tPlot, deltaT, deltaTPlot;
 double pMass, stiffness, restDensity, dynamicViscosity, gravity = -9.81;
 double neighbourRadius, smoothingLength;
-int neighbourhoodSize = pow(3, DIM);
 int *coordOffsets;
 vector<vector<int>> grid;
+ofstream videoFile;
 
 class Particle
 {
@@ -99,14 +103,16 @@ inline double pressureStateEquation(double rho)
 
 void initialiseParticles()
 {
-    particles = new Particle[numParticles];
+    particles = new Particle[numParticles]; // Initialise particles array
     
-    coordOffsets = (int*) calloc(neighbourhoodSize*3, sizeof(int));
+    // Initialise array to hold relative coordinates of a grid cell neighbourhood
+    // to the central cell
+    coordOffsets = new int[neighbourhoodSize*DIM];
     for (int i=0; i<neighbourhoodSize; i++)
     {
         for (int d=0; d<DIM; d++)
         {
-            int power = pow(3, DIM-d);
+            int power = pow(3, DIM-d-1);
             coordOffsets[coordOffsetsIndex(i, d, DIM)] = ((i / power) % 3) - 1;
         }
     }
@@ -114,8 +120,8 @@ void initialiseParticles()
 
 void releaseParticles()
 {
-    free(particles);
-    free(coordOffsets);
+    delete[] particles;
+    delete[] coordOffsets;
 }
 
 void prepareGrid(double *minP, double *maxP, double cellLength)
@@ -234,6 +240,12 @@ void calcParticleDensities()
 
 // Calculate forces on particles from viscosity, pressure
 // and external forces
+//
+// Viscosity term requiring the Laplacian of the velocity
+// is computed using Brookshaw's discrete Laplacian for SPH.
+//
+// Pressure term requiring the gradient of the pressure
+// is computed using the symmetric SPH formula.
 void calcParticleForces()
 {
     for (int p=0; p<numParticles; p++)
@@ -287,6 +299,7 @@ void calcParticleForces()
 }
 
 // Move particles
+// Semi-implicit Euler scheme
 void updateParticles()
 {
     int p, d;
@@ -310,7 +323,54 @@ void updateParticles()
     }
 }
 
-int main()
+void openParaviewVideoFile()
+{
+  videoFile.open( "result.pvd" );
+  videoFile << "<?xml version=\"1.0\"?>" << endl
+            << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">" << endl
+            << "<Collection>";
+}
+
+void closeParaviewVideoFile()
+{
+  videoFile << "</Collection>"
+            << "</VTKFile>" << endl;
+}
+
+void printParaviewSnapshot()
+{
+  static int counter = -1;
+  counter++;
+  stringstream filename;
+  filename << "result-" << counter <<  ".vtp";
+  ofstream out( filename.str().c_str() );
+  out << "<VTKFile type=\"PolyData\" >" << endl
+      << "<PolyData>" << endl
+      << " <Piece NumberOfPoints=\"" << numParticles << "\">" << endl
+      << "  <Points>" << endl
+      << "   <DataArray type=\"Float64\" NumberOfComponents=\"" << DIM << "\" format=\"ascii\">";
+      // << "   <DataArray type=\"Float32\" NumberOfComponents=\"" << DIM << "\" format=\"ascii\">";
+
+  for (int p=0; p<numParticles; p++) 
+  {
+      Particle op = particles[p];
+      
+      for (int d=0; d<DIM; d++)
+      {
+          out << op.x[d] << " ";
+      }
+  }
+
+  out << "   </DataArray>" << endl
+      << "  </Points>" << endl
+      << " </Piece>" << endl
+      << "</PolyData>" << endl
+      << "</VTKFile>"  << endl;
+
+  videoFile << "<DataSet timestep=\"" << counter << "\" group=\"\" part=\"0\" file=\"" << filename.str() << "\"/>" << endl;
+}
+
+int main(int argc, char** argv)
 {
     t = 0.0;
     tFinal = 100.0;
@@ -320,6 +380,10 @@ int main()
 
     initialiseParticles();
     prepareGrid(minPosition, maxPosition, neighbourRadius);
+
+    // Plot initial state
+    openParaviewVideoFile();
+    printParaviewSnapshot();
 
     while (t <= tFinal)
     {
@@ -332,14 +396,17 @@ int main()
         if (t >= tPlot)
         {
             // Plot state of the system
-
+            printParaviewSnapshot();
             tPlot = t + deltaTPlot;
         }
     }
 
     // Plot final state of the system
+    printParaviewSnapshot();
 
+    // Cleanup
     releaseParticles();
+    closeParaviewVideoFile();
 
     // Testing/troubleshooting actions
     // plotCubicKernel(1.0);    
