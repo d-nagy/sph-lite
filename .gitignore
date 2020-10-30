@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+*.debug
+
+# Output files
+*.vtp
+*.pvd
+*.pvsm

@@ -1,0 +1,11 @@
+2           # Dimensions
+1000         # Rest density
+0.001       # Dynamic viscosity (kg/ms)
+50         # Stiffness coefficient
+0.01        # Particle size / spacing (m)
+0.01       # Boundary particle size / spacing (m)
+0.0125        # Smoothing length (m)
+0.00001       # Timestep (s)
+0.01         # Plot interval (s)
+0.5         # End time (s)
+stationary.case
