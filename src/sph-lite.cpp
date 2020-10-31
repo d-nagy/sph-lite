@@ -129,6 +129,16 @@ inline double pressureStateEquation(double rho)
     return max(stiffness * (rho - restDensity), 0);
 }
 
+/* inline double pressureStateEquation(double rho) */
+/* { */
+/*     return max(stiffness * ((rho / restDensity) - 1), 0); */
+/* } */
+
+/* inline double pressureStateEquation(double rho) */
+/* { */
+/*     return stiffness * (pow((rho/restDensity), 7) - 1); */
+/* } */
+
 int initialiseParticles()
 {
     ifstream caseFile (caseDir + caseFilename);
@@ -176,6 +186,12 @@ int initialiseParticles()
                     if (op.x[d] > maxPosition[d])
                         maxPosition[d] = op.x[d];
                 }
+            }
+
+            linestream >> op.isBoundary;
+            if (!op.isBoundary)
+            {
+                linestream >> op.pressure;
             }
 
             particles.push_back(op);
@@ -262,9 +278,10 @@ void projectParticlesToGrid(double *minP, double cellLength)
 void calcParticleDensities()
 {
     // Loop through all particles
-    int p = 0;
+    int p = -1;
     for (auto &op : particles)
     {
+        p++;
         if (op.isBoundary) continue;
         int originCellNo = op.gridCellNo;
 
@@ -315,7 +332,7 @@ void calcParticleDensities()
             vector<int> cell = grid[cellNo];
             for (auto pNbr : cell)
             {
-                if (pNbr == p) continue;
+                /* if (pNbr == p) continue; */
                 Particle *nbr = &particles[pNbr];
                 double mass = (nbr->isBoundary) ? bpMass : fpMass; 
               
@@ -339,7 +356,6 @@ void calcParticleDensities()
 
         op.density = densitySum;
         op.pressure = pressureStateEquation(densitySum);
-        p++;
     }
 }
 
@@ -620,6 +636,7 @@ int main(int argc, char** argv)
     // Plot initial state
     openParaviewVideoFile();
     printParaviewSnapshot();
+    cout << "Time: " << t << endl;
 
     while (t <= tFinal)
     {
@@ -629,18 +646,19 @@ int main(int argc, char** argv)
         calcParticleForces();
         updateParticles();
 
-        if (t + deltaT >= tPlot)
+        if (t >= tPlot)
         {
             // Plot state of the system
             printParaviewSnapshot();
             cout << "Time: " << t << endl;
-            tPlot = t + deltaTPlot;
+            tPlot += deltaTPlot;
         }
         t += deltaT;        
     }
 
     // Plot final state of the system
     printParaviewSnapshot();
+    cout << "Time: " << t << endl;
 
     // Cleanup
     releaseParticles();
