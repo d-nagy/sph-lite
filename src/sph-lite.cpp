@@ -124,21 +124,22 @@ void plotCubicKernel(double h)
 }
 
 // Return pressure value as a function of density according to a state equation
+/* inline double pressureStateEquation(double rho) */
+/* { */
+/*     return stiffness * (rho - restDensity); */
+/* } */
+
+/* inline double pressureStateEquation(double rho) */
+/* { */
+/*     return stiffness * ((rho / restDensity) - 1); */
+/* } */
+
 inline double pressureStateEquation(double rho)
 {
-    return max(stiffness * (rho - restDensity), 0);
+    return stiffness * (pow((rho/restDensity), 7) - 1);
 }
 
-/* inline double pressureStateEquation(double rho) */
-/* { */
-/*     return max(stiffness * ((rho / restDensity) - 1), 0); */
-/* } */
-
-/* inline double pressureStateEquation(double rho) */
-/* { */
-/*     return stiffness * (pow((rho/restDensity), 7) - 1); */
-/* } */
-
+// Initialise all particle positions and densities.
 int initialiseParticles()
 {
     ifstream caseFile (caseDir + caseFilename);
@@ -209,21 +210,10 @@ int initialiseParticles()
          << "Number of boundary particles: " << numBoundaryParticles << endl
          << "Total number of particles: " << numParticles << endl;
 
-    // Initialise array to hold relative coordinates of a grid cell neighbourhood
-    // to the central cell
-    coordOffsets = new int[neighbourhoodSize*dimensions];
-    for (int i=0; i<neighbourhoodSize; i++)
-    {
-        for (int d=0; d<dimensions; d++)
-        {
-            int power = pow(3, dimensions-d-1);
-            coordOffsets[coordOffsetsIndex(i, d, dimensions)] = ((i / power) % 3) - 1;
-        }
-    }
-
     return 1;
 }
 
+// Release all array memory.
 void releaseParticles()
 {
     delete[] coordOffsets;
@@ -233,6 +223,22 @@ void releaseParticles()
     delete[] dimFactors;
 }
 
+// Initialise array to hold relative coordinates of a grid cell neighbourhood
+// to the central cell
+void initCoordOffsets()
+{
+    coordOffsets = new int[neighbourhoodSize*dimensions];
+    for (int i=0; i<neighbourhoodSize; i++)
+    {
+        for (int d=0; d<dimensions; d++)
+        {
+            int power = pow(3, dimensions-d-1);
+            coordOffsets[coordOffsetsIndex(i, d, dimensions)] = ((i / power) % 3) - 1;
+        }
+    }
+}
+
+// Create grid for all particles.
 void prepareGrid(double *minP, double *maxP, double cellLength)
 {
     grid.clear();
@@ -251,6 +257,7 @@ void prepareGrid(double *minP, double *maxP, double cellLength)
     grid.resize(gridSize);
 }
 
+// Assign each particle to a grid cell.
 void projectParticlesToGrid(double *minP, double cellLength)
 {
     int p = 0;
@@ -273,6 +280,40 @@ void projectParticlesToGrid(double *minP, double cellLength)
     }
 }
 
+// Calculate a coordinate array from an index in the semi-flattened
+// grid vector.
+int* getGridCoordArray(int cellNo)
+{
+    static int coords[3];
+    for (int d=dimensions; d>=0; d--)
+    {
+        int df = dimFactors[d];
+        int c = cellNo / df;
+        coords[d] = c;
+        cellNo -= (c * df);
+    }
+    
+    return coords;
+}
+
+// Calculate position in semi-flattened grid vector from a
+// coordinate array.
+int getGridFlatIndex(int* coordArray, int* offsetArray)
+{
+    int cellNo = 0;
+    bool valid_coords = true;
+    for (int d=0; d<dimensions; d++)
+    {
+        int c = coordArray[d] + offsetArray[d];
+        if (c < 0 || c >= gridDims[d])
+        {
+            return -1;
+        }
+        cellNo += (dimFactors[d] * c); 
+    }
+    return cellNo;
+}
+
 // Calculate particle densities using SPH interpolation
 // and particle pressures using state equation.
 void calcParticleDensities()
@@ -283,56 +324,29 @@ void calcParticleDensities()
     {
         p++;
         if (op.isBoundary) continue;
-        int originCellNo = op.gridCellNo;
 
         // Clear neighbour lists
         op.neighbours.clear();
         op.neighbourDist.clear();
 
         // Calculate this particle's grid coordinates
-        int origin[dimensions];
-        for (int d=dimensions; d>=0; d--)
-        {
-            int df = dimFactors[d];
-            int c = originCellNo / df;
-            origin[d] = c;
-            originCellNo -= (c * df);
-        } 
+        int* origin = getGridCoordArray(op.gridCellNo);
 
         // Loop through all the neighbourhood grid cells
         /* double densitySum = fpMass * cubicKernelW(0, smoothingLength); // include own contribution */
         double densitySum = 0.0;
-
         for (int i=0; i<neighbourhoodSize; i++)
         {
             // Calculate the cell index in the semi-flattened grid vector.
-            int cellNo = 0;
-            bool valid_coords = true;
-            for (int d=0; d<dimensions; d++)
-            {
-                int c = origin[d] + coordOffsets[coordOffsetsIndex(i, d, dimensions)];
-                if (c < 0 || c >= gridDims[d])
-                {
-                    valid_coords = false;
-                    break;
-                }
-                cellNo += (dimFactors[d] * c); 
-            }
+            int cellNo = getGridFlatIndex(origin, &coordOffsets[coordOffsetsIndex(i, 0, dimensions)]); 
 
-            if (!valid_coords)
+            if (cellNo < 0)
                 continue;
 
             // Loop through all particles in the grid cell
-            //  - Calculate particle distance
-            //  - Determine if particle is a neighbour
-            //  - If neighbour:
-            //      add its contribution to the density estimate
-            //      store its pointer
-            //      store its distance from the sample particle
             vector<int> cell = grid[cellNo];
             for (auto pNbr : cell)
             {
-                /* if (pNbr == p) continue; */
                 Particle *nbr = &particles[pNbr];
                 double mass = (nbr->isBoundary) ? bpMass : fpMass; 
               
@@ -354,7 +368,7 @@ void calcParticleDensities()
             }
         }
 
-        op.density = densitySum;
+        op.density = max(restDensity, densitySum);
         op.pressure = pressureStateEquation(densitySum);
     }
 }
@@ -403,7 +417,6 @@ void calcParticleForces()
             {
                 double gradWComponent = cubicKernelGradComponent(op.x[d], nbr->x[d], dist, smoothingLength);
                 op.accelPressure[d] += mass * (opPOverRhoSquared + nbrPOverRhoSquared) * gradWComponent;
-                /* bool aIsNan = isnan(gradWComponent); */
                 gradWNorm += gradWComponent * gradWComponent;
                 gradW[d] = gradWComponent;
             }
@@ -419,7 +432,6 @@ void calcParticleForces()
         }
     }
 }
-
 // Move particles
 // Semi-implicit Euler scheme
 void updateParticles()
@@ -447,8 +459,6 @@ void updateParticles()
             // Semi-implicit Euler scheme
             op.v[d] += deltaT * op.a[d];
             op.x[d] += deltaT * op.v[d];
-
-            /* bool xIsNan = isnan(op.x[d]); */
 
             if (op.x[d] < minPosition[d])
                 minPosition[d] = op.x[d];
@@ -628,7 +638,8 @@ int main(int argc, char** argv)
          << "Boundary particle mass: " << bpMass << endl;
 
     initialiseParticles();
-        
+    initCoordOffsets();
+
     prepareGrid(minPosition, maxPosition, neighbourRadius);
     projectParticlesToGrid(minPosition, neighbourRadius);
     calcParticleDensities();
