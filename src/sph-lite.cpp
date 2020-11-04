@@ -19,12 +19,22 @@ const string inputFilename = "sph.dat";
 const string caseDir = "./cases/";
 const string outputDir = "./output/";
 
-int dimensions;
+class Particle
+{
+    public:
+        bool isBoundary = false;
+        double x[3], v[3], a[3];
+        double pressure, density, internalEnergy;
+        vector<int> neighbours;
+        vector<double> neighbourDist;
+        unsigned int gridCellNo;
+        Particle() {};
+};
 
+int dimensions;
 double *minPosition, *maxPosition;
 int *gridDims, *dimFactors;
 int neighbourhoodSize;
-
 unsigned int numParticles;
 double t, tFinal, tPlot, deltaT, deltaTPlot;
 double fpMass, bpMass, stiffness, restDensity, dynamicViscosity, gravity = -9.81;
@@ -32,28 +42,6 @@ double neighbourRadius, smoothingLength, fpSize, bpSize;
 int *coordOffsets;
 ofstream videoFile;
 string caseFilename;
-
-class Particle
-{
-    public:
-        bool isBoundary = false;
-        double *x, *v, *a;
-        double *accelPressure, *laplacianVelocity;
-        double pressure, density;
-        vector<int> neighbours;
-        vector<double> neighbourDist;
-        unsigned int gridCellNo;
-        Particle() {};
-        Particle(int dims)
-        {
-            x = new double[dims];
-            v = new double[dims];
-            a = new double[dims];
-            accelPressure = new double[dims];
-            laplacianVelocity = new double[dims];
-        }
-};
-
 vector<Particle> particles;
 vector<vector<int>> grid;
 
@@ -139,6 +127,11 @@ inline double pressureStateEquation(double rho)
     return stiffness * (pow((rho/restDensity), 7) - 1);
 }
 
+inline double idealGasStateEquation(double rho, double u, double gamma)
+{
+    return rho * u * (gamma - 1);
+}
+
 // Initialise all particle positions and densities.
 int initialiseParticles()
 {
@@ -163,7 +156,7 @@ int initialiseParticles()
         // Initialise particles and set positions
         for (int p=0; p<numParticles; p++)
         {
-            Particle op = Particle(dimensions);
+            Particle op = Particle();
             op.isBoundary = (p < numBoundaryParticles);
             op.density = restDensity;
 
@@ -241,13 +234,13 @@ void initCoordOffsets()
 // Create grid for all particles.
 void prepareGrid(double *minP, double *maxP, double cellLength)
 {
+    int dim, gridSize = 1, dimFactor = 1;
+
     grid.clear();
 
-    int gridSize = 1;
-    int dimFactor = 1;
     for (int d=0; d<dimensions; d++)
     {
-        int dim = ceil((maxP[d] - minP[d] + fpSize) / cellLength);
+        dim = ceil((maxP[d] - minP[d] + fpSize) / cellLength);
         gridSize *= dim;
         gridDims[d] = dim;
         dimFactors[d] = dimFactor;
@@ -260,57 +253,35 @@ void prepareGrid(double *minP, double *maxP, double cellLength)
 // Assign each particle to a grid cell.
 void projectParticlesToGrid(double *minP, double cellLength)
 {
-    int p = 0;
+    int cellNo, p = -1;
     for (auto &op : particles)
     {
-        int cellNo = 0;
+        p++;
+        cellNo = 0;
         for (int d=0; d<dimensions; d++)
         {
             cellNo += dimFactors[d] * (int)((op.x[d] - minP[d]) / cellLength);
         }
 
-        if (cellNo >= grid.size())
-        {
-            cout << "Invalid grid cell number calculated." << endl;
-            exit(EXIT_FAILURE);
-        }
-        grid[cellNo].push_back(p);
+        grid.at(cellNo).push_back(p);
         op.gridCellNo = cellNo;
-        p++;
     }
-}
-
-// Calculate a coordinate array from an index in the semi-flattened
-// grid vector.
-int* getGridCoordArray(int cellNo)
-{
-    static int coords[3];
-    for (int d=dimensions; d>=0; d--)
-    {
-        int df = dimFactors[d];
-        int c = cellNo / df;
-        coords[d] = c;
-        cellNo -= (c * df);
-    }
-    
-    return coords;
 }
 
 // Calculate position in semi-flattened grid vector from a
 // coordinate array.
 int getGridFlatIndex(int* coordArray, int* offsetArray)
 {
-    int cellNo = 0;
+    int c, cellNo = 0;
     bool valid_coords = true;
+
     for (int d=0; d<dimensions; d++)
     {
-        int c = coordArray[d] + offsetArray[d];
-        if (c < 0 || c >= gridDims[d])
-        {
-            return -1;
-        }
+        c = coordArray[d] + offsetArray[d];
+        if (c < 0 || c >= gridDims[d]) { return -1; }
         cellNo += (dimFactors[d] * c); 
     }
+
     return cellNo;
 }
 
@@ -318,8 +289,10 @@ int getGridFlatIndex(int* coordArray, int* offsetArray)
 // and particle pressures using state equation.
 void calcParticleDensities()
 {
-    // Loop through all particles
-    int p = -1;
+    int origin[dimensions];
+    double densitySum, mass, dist;
+    int cellNo, p = -1, c, df;
+
     for (auto &op : particles)
     {
         p++;
@@ -330,28 +303,34 @@ void calcParticleDensities()
         op.neighbourDist.clear();
 
         // Calculate this particle's grid coordinates
-        int* origin = getGridCoordArray(op.gridCellNo);
+        cellNo = op.gridCellNo;
+        for (int d=dimensions; d>=0; d--)
+        {
+            df = dimFactors[d];
+            c = cellNo / df;
+            origin[d] = c;
+            cellNo -= (c * df);
+        }
 
         // Loop through all the neighbourhood grid cells
-        /* double densitySum = fpMass * cubicKernelW(0, smoothingLength); // include own contribution */
-        double densitySum = 0.0;
+        densitySum = 0.0;
         for (int i=0; i<neighbourhoodSize; i++)
         {
             // Calculate the cell index in the semi-flattened grid vector.
-            int cellNo = getGridFlatIndex(origin, &coordOffsets[coordOffsetsIndex(i, 0, dimensions)]); 
+            cellNo = getGridFlatIndex(origin, &coordOffsets[coordOffsetsIndex(i, 0, dimensions)]); 
 
             if (cellNo < 0)
                 continue;
 
             // Loop through all particles in the grid cell
-            vector<int> cell = grid[cellNo];
+            vector<int> cell = grid.at(cellNo);
             for (auto pNbr : cell)
             {
-                Particle *nbr = &particles[pNbr];
-                double mass = (nbr->isBoundary) ? bpMass : fpMass; 
+                Particle *nbr = &particles.at(pNbr);
+                mass = (nbr->isBoundary) ? bpMass : fpMass; 
               
                 // Calculate distance to sample/origin particle
-                double dist = 0;
+                dist = 0;
                 for (int d=0; d<dimensions; d++)
                 {
                     dist += (op.x[d] - nbr->x[d]) * (op.x[d] - nbr->x[d]);
@@ -373,8 +352,7 @@ void calcParticleDensities()
     }
 }
 
-// Calculate forces on particles from viscosity, pressure
-// and external forces
+// Calculate forces on particles from viscosity and pressure.
 //
 // Viscosity term requiring the Laplacian of the velocity
 // is computed using Brookshaw's discrete Laplacian for SPH.
@@ -383,51 +361,51 @@ void calcParticleDensities()
 // is computed using the symmetric SPH formula.
 void calcParticleForces()
 {
+    double gradWNorm, gradWComponent;
+    double mass, dist, opPOverRhoSquared, nbrPOverRhoSquared, nbrPressure;
+    Particle* nbr;
+
+    int p = -1;
     for (auto &op : particles)
     {
+        p++;
         if (op.isBoundary) continue;
 
-        // Reset accelPressure and laplacianVelocity arrays
+        // Reset particle accelerations
         for (int d=0; d<dimensions; d++)
         {
-            op.accelPressure[d] = 0.0;
-            op.laplacianVelocity[d] = 0.0;
+            op.a[d] = 0.0;
         }
 
-        double opRho = op.density, opP = op.pressure;
-        double opPOverRhoSquared = opP / (opRho * opRho);
+        opPOverRhoSquared = op.pressure / (op.density * op.density);
 
         int i=0;
         for (auto pNbr : op.neighbours)
         {
-            Particle *nbr = &particles[pNbr];
-            double dist = op.neighbourDist[i++];
+            nbr = &particles.at(pNbr);
+            dist = op.neighbourDist[i++];
             
             if (&op == nbr) continue;
 
-            // calculate pressure force per spatial axis
-            // as well as kernel gradient
-            double gradW[dimensions];
-            double gradWNorm = 0;
-            double nbrPressure = (nbr->isBoundary) ? op.pressure : nbr->pressure;
-            /* double nbrDensity = (nbr->isBoundary) ? op->density : nbr->density; */
-            double mass = (nbr->isBoundary) ? bpMass : fpMass;
-            double nbrPOverRhoSquared = nbrPressure / (nbr->density * nbr->density); // Should nbr->density be op->density for boundary nbrs?
+            gradWNorm = 0;
+            mass = (nbr->isBoundary) ? bpMass : fpMass;
+            nbrPressure = (nbr->isBoundary) ? op.pressure : nbr->pressure;
+            nbrPOverRhoSquared = nbrPressure / (nbr->density * nbr->density); // Should nbr->density be op->density for boundary nbrs?
+
+            // Add acceleration from pressure and calculate kernel gradient
             for (int d=0; d<dimensions; d++)
             {
-                double gradWComponent = cubicKernelGradComponent(op.x[d], nbr->x[d], dist, smoothingLength);
-                op.accelPressure[d] += mass * (opPOverRhoSquared + nbrPOverRhoSquared) * gradWComponent;
+                gradWComponent = cubicKernelGradComponent(op.x[d], nbr->x[d], dist, smoothingLength);
                 gradWNorm += gradWComponent * gradWComponent;
-                gradW[d] = gradWComponent;
+                op.a[d] -= mass * (opPOverRhoSquared + nbrPOverRhoSquared) * gradWComponent;
             }
 
             gradWNorm = sqrt(gradWNorm);
 
-            // calculate viscosity per spatial axis
-            double factor = mass * 2 * gradWNorm / (nbr->density * dist);
+            // Add acceleration from viscosity
             for (int d=0; d<dimensions; d++)
             {
-                op.laplacianVelocity[d] -= (op.v[d] - nbr->v[d]) * factor;
+                op.a[d] += (mass * 2 * gradWNorm * dynamicViscosity) * (nbr->v[d] - op.v[d]) / (op.density * nbr->density * dist);
             }
         }
     }
@@ -436,24 +414,17 @@ void calcParticleForces()
 // Semi-implicit Euler scheme
 void updateParticles()
 {
+    int p = -1;
     for (auto &op : particles)
     {
+        p++;
         if (op.isBoundary) continue;
 
         for (int d=0; d<dimensions; d++)
         {
-            // reset acceleration
-            op.a[d] = 0.0;
-
             // update particle accelerations due to external force (e.g. gravity)
             if (d == dimensions - 1)
                 op.a[d] += gravity;
-
-            // update particle accelerations due to 
-            // pressure force, viscosity force and external force (e.g. gravity)
-            double kinematicViscosity = dynamicViscosity / op.density;
-            op.a[d] += (kinematicViscosity * op.laplacianVelocity[d]); // accel. from viscosity
-            op.a[d] -= op.accelPressure[d]; // accel. from pressure
 
             // Update velocities and positions
             // Semi-implicit Euler scheme

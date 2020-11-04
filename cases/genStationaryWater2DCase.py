@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 inputFilename = '../sph.dat'
-outputFilename = 'stationary.case'
+outputFilename = 'stationaryWater2D.case'
 params = []
 inputLines = []
 
@@ -12,6 +12,7 @@ with open(inputFilename) as f:
     params = [line[0] for line in params if line]
 
 fluidParticleSize, boundaryParticleSize, smoothingLength = float(params[4]), float(params[5]), float(params[6])
+restDensity = float(params[1])
 boundaryWidth = int(np.ceil(smoothingLength*2 / boundaryParticleSize))
 
 ## Generate boundary particles for fluid container
@@ -51,7 +52,8 @@ y = fluidParticleSize / 2
 while y < 0.2:
     x = fluidParticleSize / 2
     while x < 1:
-        fluid.append((round(x, 5), round(y, 5), 0))
+        hydrostaticPressure = restDensity * 9.81 * (0.2 - y) 
+        fluid.append((round(x, 5), round(y, 5), 0, hydrostaticPressure))
         x += fluidParticleSize
     y += fluidParticleSize
 
