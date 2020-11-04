@@ -11,6 +11,7 @@
 
 #define coordOffsetsIndex(row, col, dim) ((dim*row) + col)
 #define max(x, y) ((x > y) ? x : y) 
+#define min(x, y) ((x > y) ? y : x)
 
 using namespace std;
 
@@ -32,11 +33,11 @@ class Particle
 };
 
 int dimensions;
-double *minPosition, *maxPosition;
-int *gridDims, *dimFactors;
+double minPosition[3], maxPosition[3], maxSpeedSquared = 0.0;
+int gridDims[3], dimFactors[3];
 int neighbourhoodSize;
 unsigned int numParticles;
-double t, tFinal, tPlot, deltaT, deltaTPlot;
+double t, tFinal, tPlot, deltaT, minDeltaT, deltaTPlot, cflLambda;
 double fpMass, bpMass, stiffness, restDensity, dynamicViscosity, gravity = -9.81;
 double neighbourRadius, smoothingLength, fpSize, bpSize;
 int *coordOffsets;
@@ -210,10 +211,6 @@ int initialiseParticles()
 void releaseParticles()
 {
     delete[] coordOffsets;
-    delete[] minPosition;
-    delete[] maxPosition;
-    delete[] gridDims;
-    delete[] dimFactors;
 }
 
 // Initialise array to hold relative coordinates of a grid cell neighbourhood
@@ -304,7 +301,7 @@ void calcParticleDensities()
 
         // Calculate this particle's grid coordinates
         cellNo = op.gridCellNo;
-        for (int d=dimensions; d>=0; d--)
+        for (int d=dimensions-1; d>=0; d--)
         {
             df = dimFactors[d];
             c = cellNo / df;
@@ -414,12 +411,14 @@ void calcParticleForces()
 // Semi-implicit Euler scheme
 void updateParticles()
 {
+    double speedSquared;
     int p = -1;
     for (auto &op : particles)
     {
         p++;
         if (op.isBoundary) continue;
 
+        speedSquared = 0.0;
         for (int d=0; d<dimensions; d++)
         {
             // update particle accelerations due to external force (e.g. gravity)
@@ -436,8 +435,21 @@ void updateParticles()
 
             if (op.x[d] > maxPosition[d])
                 maxPosition[d] = op.x[d];
+
+            speedSquared += op.v[d]*op.v[d];            
         }
+        
+        if (speedSquared > maxSpeedSquared)
+            maxSpeedSquared = speedSquared;
     }
+}
+
+// Update timestep size according to the CFL condition
+void updateTimestepSize()
+{
+    double cflT = cflLambda * fpSize / sqrt(maxSpeedSquared);
+    deltaT = min(tPlot - t, cflT);
+    deltaT = max(minDeltaT, deltaT);
 }
 
 void openParaviewVideoFile()
@@ -562,6 +574,16 @@ int readParameters()
 
         getline(inputFile, line);
         linestream.str(line);
+        linestream >> minDeltaT;
+        cout << "Minimum timestep: " << minDeltaT << endl;
+
+        getline(inputFile, line);
+        linestream.str(line);
+        linestream >> cflLambda;
+        cout << "CFL multiplier: " << cflLambda << endl;
+
+        getline(inputFile, line);
+        linestream.str(line);
         linestream >> deltaTPlot;
         cout << "Plot interval: " << deltaTPlot << endl;
 
@@ -596,10 +618,6 @@ int main(int argc, char** argv)
     tPlot = t + deltaTPlot;
     neighbourhoodSize = pow(3, dimensions);
     neighbourRadius = 2 * smoothingLength;
-    minPosition = new double[dimensions];
-    maxPosition = new double[dimensions];
-    gridDims = new int[dimensions];
-    dimFactors = new int[dimensions];
   
     // Set particle masses
     fpMass = restDensity * pow(fpSize, dimensions);
@@ -618,7 +636,9 @@ int main(int argc, char** argv)
     // Plot initial state
     openParaviewVideoFile();
     printParaviewSnapshot();
-    cout << "Time: " << t << endl;
+    cout << "Time: " << t << "\t"
+         << "deltaT: " << deltaT << "\t"
+         << "max speed: " << sqrt(maxSpeedSquared) << endl;
 
     while (t <= tFinal)
     {
@@ -632,15 +652,21 @@ int main(int argc, char** argv)
         {
             // Plot state of the system
             printParaviewSnapshot();
-            cout << "Time: " << t << endl;
+            cout << "Time: " << t << "\t"
+                 << "deltaT: " << deltaT << "\t"
+                 << "max speed: " << sqrt(maxSpeedSquared) << endl;
             tPlot += deltaTPlot;
         }
         t += deltaT;        
+
+        updateTimestepSize();
     }
 
     // Plot final state of the system
     printParaviewSnapshot();
-    cout << "Time: " << t << endl;
+    cout << "Time: " << t << "\t"
+         << "deltaT: " << deltaT << "\t"
+         << "max speed: " << sqrt(maxSpeedSquared) << endl;
 
     // Cleanup
     releaseParticles();

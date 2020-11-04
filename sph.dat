@@ -1,11 +1,13 @@
 2           # Dimensions
 1000         # Rest density
-0.001       # Dynamic viscosity (kg/ms)
-50         # Stiffness coefficient
+0.01       # Dynamic viscosity (kg/ms)
+5000         # Stiffness coefficient
 0.01        # Particle size / spacing (m)
 0.01       # Boundary particle size / spacing (m)
-0.0125        # Smoothing length (m)
-0.00001       # Timestep (s)
+0.015        # Smoothing length (m)
+0.0001       # Timestep (s)
+0.00001      # Minimum timestep size
+0.4         # CFL lambda multiplier
 0.01         # Plot interval (s)
-0.5         # End time (s)
-stationary.case
+0.5        # End time (s)
+stationaryWater2D.case
