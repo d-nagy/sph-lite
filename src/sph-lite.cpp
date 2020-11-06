@@ -1,6 +1,7 @@
 #include "kernels.h"
 #include "particle.h"
 #include "eos.h"
+#include "vtkout.h"
 
 #include <cmath>
 #include <iostream>
@@ -34,6 +35,7 @@ std::vector<Particle> particles;
 std::vector<std::vector<int>> grid;
 SphKernel *kernel;
 EquationOfState *eos;
+VTKResultsWriter *vtkout;
 
 // Initialise all particle positions and densities.
 int initialiseParticles()
@@ -110,9 +112,12 @@ int initialiseParticles()
 }
 
 // Release all array memory.
-void releaseParticles()
+void cleanupObjects()
 {
     delete[] coordOffsets;
+    delete kernel;
+    delete eos;
+    delete vtkout;
 }
 
 // Initialise array to hold relative coordinates of a grid cell neighbourhood
@@ -358,77 +363,6 @@ void updateTimestepSize()
     deltaT = max(minDeltaT, deltaT);
 }
 
-void openParaviewVideoFile(std::ofstream& vidfile, const std::string& outdir)
-{
-  vidfile.open(outdir + "result.pvd");
-  vidfile << "<?xml version=\"1.0\"?>" << std::endl
-          << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">" << std::endl
-          << "<Collection>";
-}
-
-void closeParaviewVideoFile(std::ofstream& vidfile)
-{
-  vidfile << "</Collection>"
-          << "</VTKFile>" << std::endl;
-}
-
-void printParaviewSnapshot(std::ofstream& vidfile, const std::string& outdir)
-{
-    static int counter = 0;
-    std::stringstream filename;
-    std::ofstream out(outdir + filename.str().c_str());
-
-    filename << "result-" << counter++ <<  ".vtp";
-
-    out << "<VTKFile type=\"PolyData\">" << std::endl
-        << "<PolyData>" << std::endl
-        << " <Piece NumberOfPoints=\"" << numParticles << "\">" << std::endl
-        << "  <Points>" << std::endl
-        << "   <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">";
-        // << "   <DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">";
-
-    for (auto &op : particles)
-    {
-      int i=0;
-      for (int d=0; d<dimensions; d++, i++)
-      {
-          out << op.x[d] << " ";
-      }
-
-      while (i < 3)
-      {
-          out << "0 ";
-          i++;
-      }
-    }
-
-    out << "   </DataArray>" << std::endl
-        << "  </Points>" << std::endl
-        << "  <PointData>" << std::endl
-        << "   <DataArray type=\"Float64\" Name=\"Density\" format=\"ascii\">" << std::endl;
-
-    for (auto &op : particles)
-    {
-        out << op.density << " ";
-    }
-
-    out << "   </DataArray>" << std::endl
-        << "   <DataArray type=\"Float64\" Name=\"Pressure\" format=\"ascii\">" << std::endl;
-
-    for (auto &op : particles)
-    {
-        out << op.pressure << " ";
-    }
-
-    out << "   </DataArray>" << std::endl
-        << "  </PointData>" << std::endl
-        << " </Piece>" << std::endl
-        << "</PolyData>" << std::endl
-        << "</VTKFile>"  << std::endl;
-
-    vidfile << "<DataSet timestep=\"" << counter << "\" group=\"\" part=\"0\" file=\"" << filename.str() << "\"/>" << std::endl;
-}
-
 int readParameters()
 {
     std::string line;
@@ -520,6 +454,7 @@ int main(int argc, char** argv)
 
     kernel = new CubicSplineKernel(dimensions);
     eos = new WeaklyCompressibleEOS(stiffness, restDensity);
+    vtkout = new VTKResultsWriter(outputDir);
 
     t = 0.0;
     tPlot = t + deltaTPlot;
@@ -541,8 +476,7 @@ int main(int argc, char** argv)
     calcParticleDensities();
 
     // Plot initial state
-    openParaviewVideoFile(videoFile, outputDir);
-    printParaviewSnapshot(videoFile, outputDir);
+    vtkout->printSnapshot(particles);
     std::cout << "Time: " << t << "\t"
               << "deltaT: " << deltaT << "\t"
               << "max speed: " << sqrt(maxSpeedSquared) << std::endl;
@@ -558,10 +492,10 @@ int main(int argc, char** argv)
         if (t >= tPlot)
         {
             // Plot state of the system
-            printParaviewSnapshot(videoFile, outputDir);
+            vtkout->printSnapshot(particles);
             std::cout << "Time: " << t << "\t"
-                 << "deltaT: " << deltaT << "\t"
-                 << "max speed: " << sqrt(maxSpeedSquared) << std::endl;
+                      << "deltaT: " << deltaT << "\t"
+                      << "max speed: " << sqrt(maxSpeedSquared) << std::endl;
             tPlot += deltaTPlot;
         }
         t += deltaT;
@@ -570,14 +504,13 @@ int main(int argc, char** argv)
     }
 
     // Plot final state of the system
-    printParaviewSnapshot(videoFile, outputDir);
+    vtkout->printSnapshot(particles);
     std::cout << "Time: " << t << "\t"
-         << "deltaT: " << deltaT << "\t"
-         << "max speed: " << sqrt(maxSpeedSquared) << std::endl;
+              << "deltaT: " << deltaT << "\t"
+              << "max speed: " << sqrt(maxSpeedSquared) << std::endl;
 
     // Cleanup
-    releaseParticles();
-    closeParaviewVideoFile(videoFile);
+    cleanupObjects();
 
     // Testing/troubleshooting actions
     /* plotCubicKernel(smoothingLength); */
