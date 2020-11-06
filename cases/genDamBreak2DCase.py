@@ -11,51 +11,40 @@ with open(inputFilename) as f:
     params = [line.strip().split() for line in inputLines]
     params = [line[0] for line in params if line]
 
-fluidParticleSize, boundaryParticleSize, smoothingLength = float(params[4]), float(params[5]), float(params[6])
+fluidParticleSize, boundaryParticleSize, smoothingLength = float(params[7]), float(params[8]), float(params[9])
 restDensity = float(params[1])
 boundaryWidth = int(np.ceil(smoothingLength*2 / boundaryParticleSize))
 
 ## Generate boundary particles for fluid container
 # start with bottom
 bottom = []
-x = boundaryParticleSize / 2
-while x < 1:
-    y = -boundaryParticleSize / 2
-    for w in range(boundaryWidth):
-        bottom.append((round(x, 5), round(y, 5), 1))
-        y -= boundaryParticleSize
-    x += boundaryParticleSize
+startx, endx = boundaryParticleSize / 2, 1
+xs = np.arange(startx, endx, boundaryParticleSize)
+ys = [i * -boundaryParticleSize - (boundaryParticleSize / 2) for i in range(boundaryWidth)]
+for x in xs:
+    for y in ys:
+        bottom.append((round(x, 5), round(y, 5), 1, 0, 0))
 
-# do the left side
-leftside = []
-y = bottom[boundaryWidth-1][1]
-while y < 0.5:
-    x = -boundaryParticleSize / 2 
-    for w in range(boundaryWidth):
-        leftside.append((round(x, 5), round(y, 5), 1))
-        x -= boundaryParticleSize
-    y += boundaryParticleSize
-
-# and the right
-rightside = []
-y = bottom[boundaryWidth-1][1]
-while y < 0.5:
-    x = bottom[-1][0] + boundaryParticleSize
-    for w in range(boundaryWidth):
-        leftside.append((round(x, 5), round(y, 5), 1))
-        x += boundaryParticleSize
-    y += boundaryParticleSize
+# do the sides
+leftside, rightside = [], []
+starty, endy = bottom[boundaryWidth-1][1], 0.5
+ys = np.arange(starty, endy, boundaryParticleSize)
+lxs = [i * -boundaryParticleSize - (boundaryParticleSize / 2) for i in range(boundaryWidth)]
+rxs = [i * boundaryParticleSize + (bottom[-1][0]) for i in range(boundaryWidth)]
+for lx, rx in zip(lxs, rxs):
+    for y in ys:
+        leftside.append((round(lx, 5), round(y, 5), 1, 0, 0))
+        rightside.append((round(rx, 5), round(y, 5), 1, 0, 0))
 
 ## Now fill in the fluid
 fluid = []
-y = fluidParticleSize / 2
-while y < 0.2:
-    x = fluidParticleSize / 2
-    while x < 0.2:
-        hydrostaticPressure = restDensity * 9.81 * (0.2 - y) 
-        fluid.append((round(x, 5), round(y, 5), 0, hydrostaticPressure))
-        x += fluidParticleSize
-    y += fluidParticleSize
+start = fluidParticleSize / 2
+end = 0.2
+ns = np.arange(start, end, fluidParticleSize)
+for x in ns:
+    for y in ns:
+        hydrostaticPressure = restDensity * 9.81 * (0.2 - y)
+        fluid.append((round(x, 5), round(y, 5), 0, hydrostaticPressure, 0))
 
 boundaryParticles = leftside[::-1] + bottom + rightside
 
@@ -78,4 +67,3 @@ plt.xlim(-0.1, 1.1)
 plt.ylim(-0.1, 0.6)
 plt.grid(True)
 plt.show()
-
