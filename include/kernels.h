@@ -3,15 +3,19 @@
 #define KERNELS_H
 
 #include <cmath>
+#include <string>
 
 class SphKernel
 {
     public:
         virtual double W(double r, double h) = 0;
         virtual double gradWComponent(double xi, double xj, double r, double h) = 0;
+        virtual inline double getSupportRadius(double h) = 0;
         virtual ~SphKernel() {};
+        friend std::ostream& operator<<(std::ostream &out, const SphKernel &kernel);
 
     protected:
+        std::string description;
         virtual double delW(double r, double h) = 0;
 };
 
@@ -21,6 +25,7 @@ class CubicSplineKernel: public SphKernel
         CubicSplineKernel(int d);
         double W(double r, double h);
         double gradWComponent(double xi, double xj, double r, double h);
+        double getSupportRadius(double h);
         void plotKernel(double h);
 
     private:

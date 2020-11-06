@@ -2,7 +2,16 @@
 #include <cmath>
 #include <iostream>
 
-CubicSplineKernel::CubicSplineKernel(int d) : dims(d) {}
+std::ostream& operator<<(std::ostream &out, const SphKernel &kernel)
+{
+    out << kernel.description;
+    return out;
+}
+
+CubicSplineKernel::CubicSplineKernel(int d) : dims(d)
+{
+    description = "Cubic Spline";
+}
 
 double CubicSplineKernel::W(double r, double h)
 {
@@ -28,6 +37,11 @@ double CubicSplineKernel::W(double r, double h)
 double CubicSplineKernel::gradWComponent(double xi, double xj, double r, double h)
 {
     return delW(r, h) * (xi - xj) / (r * h);
+}
+
+inline double CubicSplineKernel::getSupportRadius(double h)
+{
+    return 2 * h;
 }
 
 double CubicSplineKernel::delW(double r, double h)

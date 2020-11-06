@@ -22,7 +22,7 @@ VTKResultsWriter::~VTKResultsWriter()
     videoFile.close();
 }
 
-void VTKResultsWriter::printSnapshot(const std::vector<Particle>& ps)
+void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
 {
     static int counter = -1;
     std::stringstream filename;

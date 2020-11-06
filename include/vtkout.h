@@ -14,7 +14,7 @@ class VTKResultsWriter
     public:
         VTKResultsWriter(const std::string& outputDir);
         ~VTKResultsWriter();
-        void printSnapshot(const std::vector<Particle>& ps);
+        void writeSnapshot(const std::vector<Particle>& ps);
 
     private:
         std::string outputDir;

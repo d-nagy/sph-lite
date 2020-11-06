@@ -6,13 +6,13 @@ CXXFLAGS=-I$(IDIR) -O3
 SDIR=src
 ODIR=$(SDIR)/obj
 
-_SRCS=sph-lite.cpp kernels.cpp eos.cpp vtkout.cpp
+_SRCS=main.cpp kernels.cpp eos.cpp vtkout.cpp sph.cpp
 SRCS=$(patsubst %,$(SDIR)/%,$(_SRCS))
 
 _OBJS=$(_SRCS:.cpp=.o)
 OBJS=$(patsubst %,$(ODIR)/%,$(_OBJS))
 
-_DEPS=kernels.h eos.h particle.h vtkout.h
+_DEPS=kernels.h eos.h particle.h vtkout.h sph.h
 DEPS=$(patsubst %,$(IDIR)/%,$(_DEPS))
 
 EXE=sph-lite.exe

@@ -4,17 +4,24 @@
 
 #include "particle.h"
 
+#include <iostream>
+#include <string>
+
 class EquationOfState
 {
     public:
         virtual double getPressure(Particle& p) = 0;
         virtual ~EquationOfState() {};
+        friend std::ostream& operator<<(std::ostream &out, const EquationOfState &eos);
+
+    protected:
+        std::string description;
 };
 
 class WeaklyCompressibleEOS: public EquationOfState
 {
     public:
-        WeaklyCompressibleEOS(double k, double rho0) : k(k), rho0(rho0) {};
+        WeaklyCompressibleEOS(double k, double rho0);
         double getPressure(Particle& p);
 
     private:
@@ -24,7 +31,7 @@ class WeaklyCompressibleEOS: public EquationOfState
 class IdealGasEOS: public EquationOfState
 {
     public:
-        IdealGasEOS(double gamma) : gamma(gamma) {};
+        IdealGasEOS(double gamma);
         double getPressure(Particle& p);
 
     private:
