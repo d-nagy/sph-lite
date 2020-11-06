@@ -1,4 +1,6 @@
-#define _USE_MATH_DEFINES
+#include "kernels.h"
+#include "particle.h"
+#include "eos.h"
 
 #include <cmath>
 #include <iostream>
@@ -10,27 +12,12 @@
 #include <stdlib.h>
 
 #define coordOffsetsIndex(row, col, dim) ((dim*row) + col)
-#define max(x, y) ((x > y) ? x : y) 
+#define max(x, y) ((x > y) ? x : y)
 #define min(x, y) ((x > y) ? y : x)
 
-using namespace std;
-
-const double cubicKernelWNormalFactors[3] = {2.0/3.0, 10.0/(7*M_PI), 1/M_PI};
-const string inputFilename = "sph.dat";
-const string caseDir = "./cases/";
-const string outputDir = "./output/";
-
-class Particle
-{
-    public:
-        bool isBoundary = false;
-        double x[3], v[3], a[3];
-        double pressure, density, internalEnergy;
-        vector<int> neighbours;
-        vector<double> neighbourDist;
-        unsigned int gridCellNo;
-        Particle() {};
-};
+const std::string inputFilename = "sph.dat";
+const std::string caseDir = "./cases/";
+const std::string outputDir = "./output/";
 
 int dimensions;
 double minPosition[3], maxPosition[3], maxSpeedSquared = 0.0;
@@ -38,119 +25,34 @@ int gridDims[3], dimFactors[3];
 int neighbourhoodSize;
 unsigned int numParticles;
 double t, tFinal, tPlot, deltaT, minDeltaT, deltaTPlot, cflLambda;
-double fpMass, bpMass, stiffness, restDensity, dynamicViscosity, gravity = -9.81;
+double fpMass, bpMass, stiffness, restDensity, dynamicViscosity, gravity = -9.81, adiabaticIndex;
 double neighbourRadius, smoothingLength, fpSize, bpSize;
 int *coordOffsets;
-ofstream videoFile;
-string caseFilename;
-vector<Particle> particles;
-vector<vector<int>> grid;
-
-// Cubic spline kernel function with compact support of size 2h
-double cubicKernelW(double r, double h)
-{
-   double q = r/h;
-   double result = cubicKernelWNormalFactors[dimensions-1] / pow(h, (double)dimensions);
-   
-   if (q >= 0 && q < 1)
-   {
-       result *= ((2 - q)*(2 - q)*(2 - q)/4.0) - ((1 - q)*(1 - q)*(1 - q));
-   } 
-   else if (q >= 1 && q < 2)
-   {
-       result *= ((2 - q)*(2 - q)*(2 - q)/4.0);
-   }
-   else if (q >= 2)
-   {
-       result *= 0;
-   }
-
-   return result;
-}
-
-// First derivative of the cubic spline kernel w.r.t. q = r/h
-double cubicKernelDelW(double r, double h)
-{
-    double q = r/h;
-    double result = cubicKernelWNormalFactors[dimensions-1] / pow(h, (double)dimensions);
-
-    if (q >= 0 && q < 1)
-    {
-        result *= (3 * (((2 - q)*(2 - q)/-4.0) + ((1 - q)*(1 - q))));
-    } 
-    else if (q >= 1 && q < 2)
-    {
-        result *= (3 * ((2 - q)*(2 - q)/-4.0));
-    }
-    else if (q >= 2)
-    {
-        result *= 0;
-    }
-
-    return result;
-}
-
-// Calculate a single component of the cubic kernel gradient with respect to
-// the position of a particle
-inline double cubicKernelGradComponent(double x1, double x2, double r, double h)
-{
-    return cubicKernelDelW(r, h) * (x1 - x2) / (r * h);
-}
-
-// Plot kernel function and first derivative for testing
-void plotCubicKernel(double h)
-{
-    cout << "h=" << h << endl;
-    cout << "q," << "W," << "dW" << endl;
-
-    double maxR = 2*h;
-    double dq = 2*h / 100;
-    maxR += dq;
-    for (double r=0.0; r<maxR; r+=dq)
-    {
-        cout << r/h << "," << cubicKernelW(r, h) << "," << cubicKernelDelW(r, h) << endl;
-    }
-}
-
-// Return pressure value as a function of density according to a state equation
-/* inline double pressureStateEquation(double rho) */
-/* { */
-/*     return stiffness * (rho - restDensity); */
-/* } */
-
-/* inline double pressureStateEquation(double rho) */
-/* { */
-/*     return stiffness * ((rho / restDensity) - 1); */
-/* } */
-
-inline double pressureStateEquation(double rho)
-{
-    return stiffness * (pow((rho/restDensity), 7) - 1);
-}
-
-inline double idealGasStateEquation(double rho, double u, double gamma)
-{
-    return rho * u * (gamma - 1);
-}
+std::ofstream videoFile;
+std::string caseFilename;
+std::vector<Particle> particles;
+std::vector<std::vector<int>> grid;
+SphKernel *kernel;
+EquationOfState *eos;
 
 // Initialise all particle positions and densities.
 int initialiseParticles()
 {
-    ifstream caseFile (caseDir + caseFilename);
+    std::ifstream caseFile (caseDir + caseFilename);
     int numFluidParticles, numBoundaryParticles;
-    string line;
-    stringstream linestream;
+    std::string line;
+    std::stringstream linestream;
 
     if (caseFile.is_open())
     {
-        getline(caseFile, line);
+        std::getline(caseFile, line);
         linestream.str(line);
         if (linestream >> numBoundaryParticles >> numFluidParticles)
             numParticles = numBoundaryParticles + numFluidParticles;
-        
+
         if (!numParticles)
         {
-            cout << "No particles defined in case file." << endl;
+            std::cout << "No particles defined in case file." << std::endl;
             return 0;
         }
 
@@ -161,8 +63,8 @@ int initialiseParticles()
             op.isBoundary = (p < numBoundaryParticles);
             op.density = restDensity;
 
-            getline(caseFile, line);
-            linestream.clear(); 
+            std::getline(caseFile, line);
+            linestream.clear();
             linestream.str(line);
             for (int d=0; d<dimensions; d++)
             {
@@ -196,13 +98,13 @@ int initialiseParticles()
     }
     else
     {
-        cout << "Unable to open case file." << endl;
+        std::cout << "Unable to open case file." << std::endl;
         return 0;
     }
 
-    cout << "Number of fluid particles: " << numFluidParticles << endl
-         << "Number of boundary particles: " << numBoundaryParticles << endl
-         << "Total number of particles: " << numParticles << endl;
+    std::cout << "Number of fluid particles: " << numFluidParticles << std::endl
+         << "Number of boundary particles: " << numBoundaryParticles << std::endl
+         << "Total number of particles: " << numParticles << std::endl;
 
     return 1;
 }
@@ -229,7 +131,7 @@ void initCoordOffsets()
 }
 
 // Create grid for all particles.
-void prepareGrid(double *minP, double *maxP, double cellLength)
+void prepareGrid(double const minP[], double const maxP[], double cellLength)
 {
     int dim, gridSize = 1, dimFactor = 1;
 
@@ -243,12 +145,12 @@ void prepareGrid(double *minP, double *maxP, double cellLength)
         dimFactors[d] = dimFactor;
         dimFactor *= dim;
     }
-    
+
     grid.resize(gridSize);
 }
 
 // Assign each particle to a grid cell.
-void projectParticlesToGrid(double *minP, double cellLength)
+void projectParticlesToGrid(double const minP[], double cellLength)
 {
     int cellNo, p = -1;
     for (auto &op : particles)
@@ -267,7 +169,7 @@ void projectParticlesToGrid(double *minP, double cellLength)
 
 // Calculate position in semi-flattened grid vector from a
 // coordinate array.
-int getGridFlatIndex(int* coordArray, int* offsetArray)
+int getGridFlatIndex(int const coordArray[], int const offsetArray[])
 {
     int c, cellNo = 0;
     bool valid_coords = true;
@@ -276,7 +178,7 @@ int getGridFlatIndex(int* coordArray, int* offsetArray)
     {
         c = coordArray[d] + offsetArray[d];
         if (c < 0 || c >= gridDims[d]) { return -1; }
-        cellNo += (dimFactors[d] * c); 
+        cellNo += (dimFactors[d] * c);
     }
 
     return cellNo;
@@ -314,23 +216,23 @@ void calcParticleDensities()
         for (int i=0; i<neighbourhoodSize; i++)
         {
             // Calculate the cell index in the semi-flattened grid vector.
-            cellNo = getGridFlatIndex(origin, &coordOffsets[coordOffsetsIndex(i, 0, dimensions)]); 
+            cellNo = getGridFlatIndex(origin, &coordOffsets[coordOffsetsIndex(i, 0, dimensions)]);
 
             if (cellNo < 0)
                 continue;
 
             // Loop through all particles in the grid cell
-            vector<int> cell = grid.at(cellNo);
+            std::vector<int> &cell = grid.at(cellNo);
             for (auto pNbr : cell)
             {
-                Particle *nbr = &particles.at(pNbr);
-                mass = (nbr->isBoundary) ? bpMass : fpMass; 
-              
+                Particle &nbr = particles.at(pNbr);
+                mass = (nbr.isBoundary) ? bpMass : fpMass;
+
                 // Calculate distance to sample/origin particle
                 dist = 0;
                 for (int d=0; d<dimensions; d++)
                 {
-                    dist += (op.x[d] - nbr->x[d]) * (op.x[d] - nbr->x[d]);
+                    dist += (op.x[d] - nbr.x[d]) * (op.x[d] - nbr.x[d]);
                 }
                 dist = sqrt(dist);
 
@@ -339,13 +241,13 @@ void calcParticleDensities()
                 {
                     op.neighbours.push_back(pNbr);
                     op.neighbourDist.push_back(dist);
-                    densitySum += (mass * cubicKernelW(dist, smoothingLength));
+                    densitySum += (mass * kernel->W(dist, smoothingLength));
                 }
             }
         }
 
         op.density = max(restDensity, densitySum);
-        op.pressure = pressureStateEquation(densitySum);
+        op.pressure = eos->getPressure(op);
     }
 }
 
@@ -358,9 +260,8 @@ void calcParticleDensities()
 // is computed using the symmetric SPH formula.
 void calcParticleForces()
 {
-    double gradWNorm, gradWComponent;
+    double gradWNorm, gradWComponent, temperatureDerivativeSum;
     double mass, dist, opPOverRhoSquared, nbrPOverRhoSquared, nbrPressure;
-    Particle* nbr;
 
     int p = -1;
     for (auto &op : particles)
@@ -374,27 +275,29 @@ void calcParticleForces()
             op.a[d] = 0.0;
         }
 
+        /* op.temperatureDerivative = 0; */
         opPOverRhoSquared = op.pressure / (op.density * op.density);
 
         int i=0;
         for (auto pNbr : op.neighbours)
         {
-            nbr = &particles.at(pNbr);
+            Particle &nbr = particles.at(pNbr);
             dist = op.neighbourDist[i++];
-            
-            if (&op == nbr) continue;
+
+            if (&op == &nbr) continue;
 
             gradWNorm = 0;
-            mass = (nbr->isBoundary) ? bpMass : fpMass;
-            nbrPressure = (nbr->isBoundary) ? op.pressure : nbr->pressure;
-            nbrPOverRhoSquared = nbrPressure / (nbr->density * nbr->density); // Should nbr->density be op->density for boundary nbrs?
+            mass = (nbr.isBoundary) ? bpMass : fpMass;
+            nbrPressure = (nbr.isBoundary) ? op.pressure : nbr.pressure;
+            nbrPOverRhoSquared = nbrPressure / (nbr.density * nbr.density); // Should nbr.density be op.density for boundary nbrs?
 
             // Add acceleration from pressure and calculate kernel gradient
             for (int d=0; d<dimensions; d++)
             {
-                gradWComponent = cubicKernelGradComponent(op.x[d], nbr->x[d], dist, smoothingLength);
+                gradWComponent = kernel->gradWComponent(op.x[d], nbr.x[d], dist, smoothingLength);
                 gradWNorm += gradWComponent * gradWComponent;
                 op.a[d] -= mass * (opPOverRhoSquared + nbrPOverRhoSquared) * gradWComponent;
+                /* op.temperatureDerivative += mass * (opPOverRhoSquared + nbrPOverRhoSquared) * (op.v[d] - nbr.v[d]) * gradWComponent / 2; */
             }
 
             gradWNorm = sqrt(gradWNorm);
@@ -402,7 +305,7 @@ void calcParticleForces()
             // Add acceleration from viscosity
             for (int d=0; d<dimensions; d++)
             {
-                op.a[d] += (mass * 2 * gradWNorm * dynamicViscosity) * (nbr->v[d] - op.v[d]) / (op.density * nbr->density * dist);
+                op.a[d] += (mass * 2 * gradWNorm * dynamicViscosity) * (nbr.v[d] - op.v[d]) / (op.density * nbr.density * dist);
             }
         }
     }
@@ -430,15 +333,18 @@ void updateParticles()
             op.v[d] += deltaT * op.a[d];
             op.x[d] += deltaT * op.v[d];
 
+            // Update temperature
+            /* op.temperature += deltaT * op.temperatureDerivative; */
+
             if (op.x[d] < minPosition[d])
                 minPosition[d] = op.x[d];
 
             if (op.x[d] > maxPosition[d])
                 maxPosition[d] = op.x[d];
 
-            speedSquared += op.v[d]*op.v[d];            
+            speedSquared += op.v[d]*op.v[d];
         }
-        
+
         if (speedSquared > maxSpeedSquared)
             maxSpeedSquared = speedSquared;
     }
@@ -452,156 +358,154 @@ void updateTimestepSize()
     deltaT = max(minDeltaT, deltaT);
 }
 
-void openParaviewVideoFile()
+void openParaviewVideoFile(std::ofstream& vidfile, const std::string& outdir)
 {
-  videoFile.open( outputDir + "result.pvd" );
-  videoFile << "<?xml version=\"1.0\"?>" << endl
-            << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">" << endl
-            << "<Collection>";
+  vidfile.open(outdir + "result.pvd");
+  vidfile << "<?xml version=\"1.0\"?>" << std::endl
+          << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">" << std::endl
+          << "<Collection>";
 }
 
-void closeParaviewVideoFile()
+void closeParaviewVideoFile(std::ofstream& vidfile)
 {
-  videoFile << "</Collection>"
-            << "</VTKFile>" << endl;
+  vidfile << "</Collection>"
+          << "</VTKFile>" << std::endl;
 }
 
-void printParaviewSnapshot()
+void printParaviewSnapshot(std::ofstream& vidfile, const std::string& outdir)
 {
-    static int counter = -1;
-    counter++;
-    stringstream filename;
-    filename << "result-" << counter <<  ".vtp";
-    ofstream out( outputDir + filename.str().c_str() );
-    out << "<VTKFile type=\"PolyData\" >" << endl
-        << "<PolyData>" << endl
-        << " <Piece NumberOfPoints=\"" << numParticles << "\">" << endl
-        << "  <Points>" << endl
+    static int counter = 0;
+    std::stringstream filename;
+    std::ofstream out(outdir + filename.str().c_str());
+
+    filename << "result-" << counter++ <<  ".vtp";
+
+    out << "<VTKFile type=\"PolyData\">" << std::endl
+        << "<PolyData>" << std::endl
+        << " <Piece NumberOfPoints=\"" << numParticles << "\">" << std::endl
+        << "  <Points>" << std::endl
         << "   <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">";
         // << "   <DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">";
 
-    for (int p=0; p<numParticles; p++) 
+    for (auto &op : particles)
     {
-      Particle *op = &particles[p];
-      
       int i=0;
       for (int d=0; d<dimensions; d++, i++)
       {
-          out << op->x[d] << " ";
+          out << op.x[d] << " ";
       }
 
-      while (i < 3) 
+      while (i < 3)
       {
           out << "0 ";
           i++;
       }
     }
 
-    out << "   </DataArray>" << endl
-        << "  </Points>" << endl
-        << "  <PointData>" << endl
-        << "   <DataArray type=\"Float64\" Name=\"Density\" format=\"ascii\">" << endl;
+    out << "   </DataArray>" << std::endl
+        << "  </Points>" << std::endl
+        << "  <PointData>" << std::endl
+        << "   <DataArray type=\"Float64\" Name=\"Density\" format=\"ascii\">" << std::endl;
 
-    
-    for (int p=0; p<numParticles; p++) 
+    for (auto &op : particles)
     {
-        out << particles[p].density << " ";
+        out << op.density << " ";
     }
 
-    out << "   </DataArray>" << endl
-        << "   <DataArray type=\"Float64\" Name=\"Pressure\" format=\"ascii\">" << endl;
+    out << "   </DataArray>" << std::endl
+        << "   <DataArray type=\"Float64\" Name=\"Pressure\" format=\"ascii\">" << std::endl;
 
-    for (int p=0; p<numParticles; p++)
+    for (auto &op : particles)
     {
-        out << particles[p].pressure << " ";
+        out << op.pressure << " ";
     }
 
-    out << "   </DataArray>" << endl
-        << "  </PointData>" << endl
-        << " </Piece>" << endl
-        << "</PolyData>" << endl
-        << "</VTKFile>"  << endl;
+    out << "   </DataArray>" << std::endl
+        << "  </PointData>" << std::endl
+        << " </Piece>" << std::endl
+        << "</PolyData>" << std::endl
+        << "</VTKFile>"  << std::endl;
 
-    videoFile << "<DataSet timestep=\"" << counter << "\" group=\"\" part=\"0\" file=\"" << filename.str() << "\"/>" << endl;
+    vidfile << "<DataSet timestep=\"" << counter << "\" group=\"\" part=\"0\" file=\"" << filename.str() << "\"/>" << std::endl;
 }
 
 int readParameters()
 {
-    string line;
-    ifstream inputFile (inputFilename);
-    stringstream linestream;
+    std::string line;
+    std::ifstream inputFile (inputFilename);
+    std::stringstream linestream;
     if (inputFile.is_open())
     {
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> dimensions;
-        cout << "Dimensions: " << dimensions << endl;
-        
-        getline(inputFile, line);
+        std::cout << "Dimensions: " << dimensions << std::endl;
+
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> restDensity;
-        cout << "Rest density: " << restDensity << endl;
+        std::cout << "Rest density: " << restDensity << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> dynamicViscosity;
-        cout << "Dynamic viscosity: " << dynamicViscosity << endl;
+        std::cout << "Dynamic viscosity: " << dynamicViscosity << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> stiffness;
-        cout << "Stiffness coefficient: " << stiffness << endl;
+        std::cout << "Stiffness coefficient: " << stiffness << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> fpSize;
-        cout << "Fluid particle size: " << fpSize << endl;
+        std::cout << "Fluid particle size: " << fpSize << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> bpSize;
-        cout << "Boundary particle size: " << bpSize << endl;
+        std::cout << "Boundary particle size: " << bpSize << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> smoothingLength;
-        cout << "Smoothing length: " << smoothingLength << endl;
+        std::cout << "Smoothing length: " << smoothingLength << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> deltaT;
-        cout << "Timestep: " << deltaT << endl;
+        std::cout << "Timestep: " << deltaT << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> minDeltaT;
-        cout << "Minimum timestep: " << minDeltaT << endl;
+        std::cout << "Minimum timestep: " << minDeltaT << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> cflLambda;
-        cout << "CFL multiplier: " << cflLambda << endl;
+        std::cout << "CFL multiplier: " << cflLambda << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
         linestream >> deltaTPlot;
-        cout << "Plot interval: " << deltaTPlot << endl;
+        std::cout << "Plot interval: " << deltaTPlot << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         linestream.str(line);
-        linestream >> tFinal; 
-        cout << "Final time: " << tFinal << endl;
+        linestream >> tFinal;
+        std::cout << "Final time: " << tFinal << std::endl;
 
-        getline(inputFile, line);
+        std::getline(inputFile, line);
         caseFilename = line;
-        cout << "Case file: " << caseFilename << endl;
+        std::cout << "Case file: " << caseFilename << std::endl;
 
         inputFile.close();
         return 1;
     }
     else
     {
-        cout << "Unable to open parameters file." << endl;
+        std::cout << "Unable to open parameters file." << std::endl;
         return 0;
     }
 }
@@ -610,21 +514,24 @@ int main(int argc, char** argv)
 {
     if (readParameters())
     {
-        cout << "All parameters read successfully." << endl;
+        std::cout << "All parameters read successfully." << std::endl;
     }
     else return 1;
+
+    kernel = new CubicSplineKernel(dimensions);
+    eos = new WeaklyCompressibleEOS(stiffness, restDensity);
 
     t = 0.0;
     tPlot = t + deltaTPlot;
     neighbourhoodSize = pow(3, dimensions);
     neighbourRadius = 2 * smoothingLength;
-  
+
     // Set particle masses
     fpMass = restDensity * pow(fpSize, dimensions);
     bpMass = restDensity * pow(bpSize, dimensions);
 
-    cout << "Fluid particle mass: " << fpMass << endl
-         << "Boundary particle mass: " << bpMass << endl;
+    std::cout << "Fluid particle mass: " << fpMass << std::endl
+              << "Boundary particle mass: " << bpMass << std::endl;
 
     initialiseParticles();
     initCoordOffsets();
@@ -634,11 +541,11 @@ int main(int argc, char** argv)
     calcParticleDensities();
 
     // Plot initial state
-    openParaviewVideoFile();
-    printParaviewSnapshot();
-    cout << "Time: " << t << "\t"
-         << "deltaT: " << deltaT << "\t"
-         << "max speed: " << sqrt(maxSpeedSquared) << endl;
+    openParaviewVideoFile(videoFile, outputDir);
+    printParaviewSnapshot(videoFile, outputDir);
+    std::cout << "Time: " << t << "\t"
+              << "deltaT: " << deltaT << "\t"
+              << "max speed: " << sqrt(maxSpeedSquared) << std::endl;
 
     while (t <= tFinal)
     {
@@ -651,28 +558,27 @@ int main(int argc, char** argv)
         if (t >= tPlot)
         {
             // Plot state of the system
-            printParaviewSnapshot();
-            cout << "Time: " << t << "\t"
+            printParaviewSnapshot(videoFile, outputDir);
+            std::cout << "Time: " << t << "\t"
                  << "deltaT: " << deltaT << "\t"
-                 << "max speed: " << sqrt(maxSpeedSquared) << endl;
+                 << "max speed: " << sqrt(maxSpeedSquared) << std::endl;
             tPlot += deltaTPlot;
         }
-        t += deltaT;        
+        t += deltaT;
 
         updateTimestepSize();
     }
 
     // Plot final state of the system
-    printParaviewSnapshot();
-    cout << "Time: " << t << "\t"
+    printParaviewSnapshot(videoFile, outputDir);
+    std::cout << "Time: " << t << "\t"
          << "deltaT: " << deltaT << "\t"
-         << "max speed: " << sqrt(maxSpeedSquared) << endl;
+         << "max speed: " << sqrt(maxSpeedSquared) << std::endl;
 
     // Cleanup
     releaseParticles();
-    closeParaviewVideoFile();
+    closeParaviewVideoFile(videoFile);
 
     // Testing/troubleshooting actions
-    /* plotCubicKernel(smoothingLength); */    
+    /* plotCubicKernel(smoothingLength); */
 }
-

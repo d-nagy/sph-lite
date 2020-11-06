@@ -36,3 +36,6 @@
 *.vtp
 *.pvd
 *.pvsm
+
+# VSCode files
+.vscode/*
