@@ -9,6 +9,12 @@
 #include <vector>
 #include <string>
 
+enum BoundaryConditions
+{
+    destructive,
+    periodic
+};
+
 class SPH
 {
     public:
@@ -31,7 +37,8 @@ class SPH
             SphKernel *kernel,
             double fps,
             double bps,
-            double sl);
+            double sl,
+            BoundaryConditions bc);
         ~SPH();
 
     private:
@@ -50,14 +57,18 @@ class SPH
         double boundaryParticleMass;
         int* coordOffsets;
         int gridDims[3];
+        int gridNbrhoodSize;
         int dimFactors[3];
         double minPosition[3];
         double maxPosition[3];
+        double domainMin[3];
+        double domainMax[3];
+        int numBoundaryParticles;
+        BoundaryConditions boundaryConditions;
         std::vector<std::vector<int>> grid;
         void initCoordOffsetArray();
         void resizeGrid();
         void projectParticlesToGrid();
-        int getGridFlatIndex(int const coordArray[], int const offsetArray[]);
 };
 
 #endif

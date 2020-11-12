@@ -1,17 +1,19 @@
 2               # Dimensions
-1000            # Rest density
-0.001           # Dynamic viscosity (kg/ms)
+1               # Rest density
+0.00001           # Dynamic viscosity (kg/ms)
 1000            # Stiffness coefficient
-1.4             # Adiabatic index
--9.81           # External gravitational acceleration
-wc              # Equation of state
-0.01            # Fluid particle size / spacing (m)
+1.666             # Adiabatic index
+0              # External gravitational acceleration
+ig              # Equation of state
+0.01           # Fluid particle size / spacing (m)
 0.01            # Boundary particle size / spacing (m)
-0.015           # Smoothing length (m)
+0.02           # Smoothing length (m)
 cubicspline     # SPH kernel
-0.0001          # Timestep (s)
+periodic        # Boundary handling
+0.00001         # Timestep (s)
 0.00001         # Minimum timestep size
+0.001           # Maximum timestep size
 0.4             # CFL lambda multiplier
-0.01            # Plot interval (s)
-0.5             # End time (s)
-damBreak2D.case
+0.004           # Plot interval (s)
+0.16             # End time (s)
+sedovBlast2D.case

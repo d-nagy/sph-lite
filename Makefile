@@ -1,7 +1,7 @@
 IDIR=include
 
 CXX=g++
-CXXFLAGS=-I$(IDIR) -O3
+CXXFLAGS=-I$(IDIR)
 
 SDIR=src
 ODIR=$(SDIR)/obj
@@ -18,10 +18,16 @@ DEPS=$(patsubst %,$(IDIR)/%,$(_DEPS))
 EXE=sph-lite.exe
 DBGEXE=sph-lite.exe.debug
 
-all: clean $(EXE)
+all: release
+
+release: CXXFLAGS += -O3
+release: clean $(EXE)
+
+parallel: CXXFLAGS += -fopenmp
+parallel: clean release
 
 debug: CXXFLAGS += -g
-debug: $(DBGEXE)
+debug: clean $(DBGEXE)
 
 $(ODIR)/%.o: $(SDIR)/%.cpp $(DEPS)
 	$(CXX) -c -o $@ $< $(CXXFLAGS)

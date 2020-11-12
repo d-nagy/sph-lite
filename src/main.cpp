@@ -22,9 +22,10 @@ const std::string outputDir = "./output/";
 std::string casefileName;
 
 int dimensions;
-double t, tFinal, tPlot, deltaT, minDeltaT, deltaTPlot, cflLambda, cflT;
+double t, tFinal, tPlot, deltaT, minDeltaT, maxDeltaT, deltaTPlot, cflLambda, cflT;
 double fpMass, bpMass, fpSize, bpSize;
 double stiffness, restDensity, dynamicViscosity, gravity, adiabaticIndex, smoothingLength;
+BoundaryConditions boundaryConditions;
 
 SphKernel *kernel;
 EquationOfState *eos;
@@ -32,7 +33,7 @@ EquationOfState *eos;
 // Read and initialise all parameters from input file, with some validation.
 int readParameters()
 {
-    std::string line, eosString, kernelString;
+    std::string line, eosString, kernelString, bcString;
     std::ifstream paramFile (paramfileName);
     std::stringstream linestream;
 
@@ -111,11 +112,32 @@ int readParameters()
 
         std::getline(paramFile, line);
         linestream.str(line);
+        linestream >> bcString;
+        if (bcString.compare("periodic") == 0)
+        {
+            boundaryConditions = periodic;
+        }
+        else if (bcString.compare("destructive") == 0)
+        {
+            boundaryConditions = destructive;
+        }
+        else
+        {
+            std::cout << "ERROR: Unknown boundary conditions specified: \"" << bcString << "\"" << std::endl;
+            return 0;
+        }
+
+        std::getline(paramFile, line);
+        linestream.str(line);
         linestream >> deltaT;
 
         std::getline(paramFile, line);
         linestream.str(line);
         linestream >> minDeltaT;
+
+        std::getline(paramFile, line);
+        linestream.str(line);
+        linestream >> maxDeltaT;
 
         std::getline(paramFile, line);
         linestream.str(line);
@@ -158,7 +180,8 @@ int main(int argc, char** argv)
                kernel,
                fpSize,
                bpSize,
-               smoothingLength);
+               smoothingLength,
+               boundaryConditions);
 
     sphSim.printParameters();
     std::cout << "Timestep: " << deltaT << std::endl
@@ -189,7 +212,7 @@ int main(int argc, char** argv)
         sphSim.calcParticleForces();
         sphSim.stepParticles(deltaT);
 
-        if (t >= tPlot)
+        if (deltaTPlot > 0 && t >= tPlot)
         {
             // Plot state of the system
             vtkout.writeSnapshot(sphSim.particles);
@@ -201,8 +224,9 @@ int main(int argc, char** argv)
         t += deltaT;
 
         cflT = sphSim.getCFLTimestep(cflLambda);
-        deltaT = min(tPlot - t, cflT);
+        deltaT = (deltaTPlot > 0) ? min(tPlot - t, cflT) : cflT;
         deltaT = max(minDeltaT, deltaT);
+        deltaT = min(maxDeltaT, deltaT);
     }
 
     // Plot final state of the system

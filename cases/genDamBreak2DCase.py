@@ -50,6 +50,7 @@ boundaryParticles = leftside[::-1] + bottom + rightside
 
 with open(outputFilename, 'w') as f:
     f.write(f'{len(boundaryParticles)} {len(fluid)}\n')
+    f.write('-0.2 -0.2 0 1.2 1 0\n')
     for p in boundaryParticles + fluid:
         f.write(' '.join(list(map(str, p))) + '\n')
 

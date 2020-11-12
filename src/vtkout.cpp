@@ -6,6 +6,7 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 VTKResultsWriter::VTKResultsWriter(const std::string& outputDir) : outputDir(outputDir)
 {
@@ -26,9 +27,9 @@ void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
 {
     static int counter = -1;
     std::stringstream filename;
-    std::ofstream out(outputDir + filename.str().c_str());
-
     filename << "result-" << ++counter <<  ".vtp";
+
+    std::ofstream out(outputDir + filename.str().c_str());
 
     out << "<VTKFile type=\"PolyData\">" << std::endl
         << "<PolyData>" << std::endl
@@ -40,10 +41,10 @@ void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
     // Output particle positions
     for (auto &p : ps)
     {
-      for (int d=0; d<3; d++)
-      {
-          out << p.x[d] << " ";
-      }
+        for (int d=0; d<3; d++)
+        {
+            out << p.x[d] << " ";
+        }
     }
 
     out << "   </DataArray>" << std::endl
@@ -67,10 +68,30 @@ void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
     }
 
     out << "   </DataArray>" << std::endl
+        << "   <DataArray type=\"Float64\" Name=\"EnergyPerMass\" format=\"ascii\">" << std::endl;
+
+    // Output particle internal energy per mass
+    for (auto &p : ps)
+    {
+        out << p.energyPerMass << " ";
+    }
+
+    out << "   </DataArray>" << std::endl
+        << "   <DataArray type=\"Int32\" Name=\"CellNumber\" format=\"ascii\">" << std::endl;
+
+    // Output particle internal energy per mass
+    for (auto &p : ps)
+    {
+        out << p.gridCellNo % 10 << " ";
+    }
+
+    out << "   </DataArray>" << std::endl
         << "  </PointData>" << std::endl
         << " </Piece>" << std::endl
         << "</PolyData>" << std::endl
         << "</VTKFile>"  << std::endl;
+
+    out.close();
 
     videoFile << "<DataSet timestep=\"" << counter << "\" group=\"\" part=\"0\" file=\"" << filename.str() << "\"/>" << std::endl;
 }

@@ -1,11 +1,26 @@
 #include "kernels.h"
-#include <cmath>
 #include <iostream>
 
 std::ostream& operator<<(std::ostream &out, const SphKernel &kernel)
 {
     out << kernel.description;
     return out;
+}
+
+double SphKernel::powerH(double h, int d)
+{
+    double result = h;
+    switch (d)
+    {
+        case 2:
+            result *= h;
+            break;
+        case 3:
+            result *= h*h;
+        default:
+            break;
+    }
+    return result;
 }
 
 CubicSplineKernel::CubicSplineKernel(int d) : dims(d)
@@ -16,19 +31,19 @@ CubicSplineKernel::CubicSplineKernel(int d) : dims(d)
 double CubicSplineKernel::W(double r, double h)
 {
     double q = r/h;
-    double result = normalFactors[dims-1] / pow(h, (double)dims);
+    double result = normalFactors[dims-1] / powerH(h, dims);
 
-    if (q >= 0 && q < 1)
+    if (q >= 2)
     {
-       result *= ((2 - q)*(2 - q)*(2 - q)/4.0) - ((1 - q)*(1 - q)*(1 - q));
+        result *= 0;
     }
-    else if (q >= 1 && q < 2)
+    else if (q >= 1)
     {
-       result *= ((2 - q)*(2 - q)*(2 - q)/4.0);
+        result *= (0.25 * (2 - q)*(2 - q)*(2 - q));
     }
-    else if (q >= 2)
+    else
     {
-       result *= 0;
+        result *= (1 - 1.5*q*q*(1 - q/2));
     }
 
     return result;
@@ -47,19 +62,20 @@ inline double CubicSplineKernel::getSupportRadius(double h)
 double CubicSplineKernel::delW(double r, double h)
 {
     double q = r/h;
-    double result = normalFactors[dims-1] / pow(h, (double)dims);
+    double result = normalFactors[dims-1] / powerH(h, dims);
 
-    if (q >= 0 && q < 1)
-    {
-        result *= (3 * (((2 - q)*(2 - q)/-4.0) + ((1 - q)*(1 - q))));
-    }
-    else if (q >= 1 && q < 2)
-    {
-        result *= (3 * ((2 - q)*(2 - q)/-4.0));
-    }
-    else if (q >= 2)
+    if (q >= 2)
     {
         result *= 0;
+    }
+    else if (q >= 1)
+    {
+        result *= (-0.75 * ((2 - q)*(2 - q)));
+    }
+    else
+    {
+        // result *= (3 * (((2 - q)*(2 - q)/-4.0) + ((1 - q)*(1 - q))));
+        result *= (0.75*q * (3*q - 4));
     }
 
     return result;

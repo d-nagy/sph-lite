@@ -8,6 +8,7 @@ class Particle
 {
     public:
         bool isBoundary = false;
+        bool isActive = true;
         double x[3], v[3], a[3];
         double pressure, density, energyPerMass, energyPerMassDerivative;
         std::vector<int> neighbours;

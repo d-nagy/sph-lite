@@ -17,6 +17,7 @@ class SphKernel
     protected:
         std::string description;
         virtual double delW(double r, double h) = 0;
+        double powerH(double h, int d);
 };
 
 class CubicSplineKernel: public SphKernel
