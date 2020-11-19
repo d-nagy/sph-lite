@@ -15,5 +15,5 @@ wcsph           # SPH scheme
 0.001           # Maximum timestep size
 0.4             # CFL lambda multiplier
 0.04           # Plot interval (s)
-2            # End time (s)
+0.08            # End time (s)
 stationaryWater2D.case

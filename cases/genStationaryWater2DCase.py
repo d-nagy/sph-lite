@@ -30,7 +30,7 @@ leftside, rightside = [], []
 starty, endy = bottom[boundaryWidth-1][1], 0.5
 ys = np.arange(starty, endy, boundaryParticleSize)
 lxs = [i * -boundaryParticleSize - (boundaryParticleSize / 2) for i in range(boundaryWidth)]
-rxs = [i * boundaryParticleSize + (bottom[-1][0]) for i in range(boundaryWidth)]
+rxs = [(i+1) * boundaryParticleSize + (bottom[-1][0]) for i in range(boundaryWidth)]
 for lx, rx in zip(lxs, rxs):
     for y in ys:
         leftside.append((round(lx, 5), round(y, 5), 1, 0, 0))

@@ -1,8 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import random as rnd
 
 def gaussianKernel(x, y, sig):
     return np.exp(-(x**2 + y**2) / (2 * sig**2)) / (2 * np.pi * sig**2)
+
+def getRandomDeviation(radius):
+    rx = ry = radius
+    while np.sqrt(rx**2 + ry**2) > radius:
+        rx = rnd.uniform(-radius, radius)
+        ry = rnd.uniform(-radius, radius)
+    return rx, ry
 
 inputFilename = '../sedov.dat'
 outputFilename = 'sedovBlast2D.case'
@@ -22,6 +30,7 @@ gamma = float(params[10])
 energySpike = 0.1
 spikeRadius = 0.08 # fluidParticleSize * 1.2
 bgdU = 1e-5 / (restDensity * (gamma - 1))
+particleNoise = fluidParticleSize / 4
 
 if kernel == 'cubicspline':
     supportRadius = 2 * h
@@ -41,7 +50,8 @@ for i, x in enumerate(ns):
         dist = np.sqrt(x**2 + y**2)
         if dist < spikeRadius:
             spikeParticles.append(i*len(ns) + j)
-        fluid.append([round(x, 5), round(y, 5), 0, 0, u])
+        noiseX, noiseY = getRandomDeviation(particleNoise)
+        fluid.append([round(x + noiseX, 5), round(y + noiseY, 5), 0, 0, u])
 
 # uSpike = energySpike / (pmass * len(spikeParticles))
 

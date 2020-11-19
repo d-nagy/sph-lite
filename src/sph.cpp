@@ -128,7 +128,7 @@ void SPH::calcParticleDensities()
 // is computed using the symmetric SPH formula.
 void SPH::calcParticleForces()
 {
-    double gradWNorm, gradWComponent, gradW[3];
+    double gradWNorm, gradWComponent;
     double mass, dist, opPOverRhoSquared, nbrPOverRhoSquared, nbrPressure;
 
     int nMax = particles.size();
@@ -162,7 +162,6 @@ void SPH::calcParticleForces()
             {
                 gradWComponent = kernel->gradWComponent(op.x[d], nbr.x[d], dist, smoothingLength);
                 gradWNorm += gradWComponent * gradWComponent;
-                gradW[d] = gradWComponent;
 
                 // Add acceleration from pressure
                 op.a[d] -= mass * (opPOverRhoSquared + nbrPOverRhoSquared) * gradWComponent;
@@ -183,44 +182,6 @@ void SPH::calcParticleForces()
         }
     }
 }
-
-// void SPH::addViscosityAcceleration(Particle& op, const Particle& nbr, const double (&gradW)[3], const double dist, const double mass)
-// {
-//     double gradWNorm = 0;
-//     for (int d=0; d<dimensions; d++)
-//     {
-//         gradWNorm += gradW[d]*gradW[d];
-//     }
-
-//     gradWNorm = sqrt(gradWNorm);
-
-//     if (dist > 1e-12)
-//     {
-//         for (int d=0; d<dimensions; d++)
-//         {
-//             op.a[d] += (mass * 2 * gradWNorm * dynamicViscosity) * (nbr.v[d] - op.v[d]) / (op.density * nbr.density * dist);
-//         }
-//     }
-// }
-
-// void WCSPH::addViscosityAcceleration(Particle& op, const Particle& nbr, const double (&gradW)[3], const double dist, const double mass)
-// {
-//     double dvDotdx = 0;
-//     for (int d=0; d<dimensions; d++)
-//     {
-//         dvDotdx += (op.v[d] - nbr.v[d]) * (op.x[d] - nbr.x[d]);
-//     }
-
-//     if (dvDotdx < 0)
-//     {
-//         double viscousTerm = 2 * viscosityAlpha * smoothingLength * soundSpeed / (op.density + nbr.density);
-//         double capitalPi = -viscousTerm * dvDotdx / (dist*dist + 0.01*smoothingLength*smoothingLength);
-//         for (int d=0; d<dimensions; d++)
-//         {
-//             op.a[d] -= mass * capitalPi * gradW[d];
-//         }
-//     }
-// }
 
 // Move particles
 // Semi-implicit Euler scheme
