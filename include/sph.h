@@ -22,31 +22,27 @@ class SPH
         std::vector<Particle> particles;
         int initialiseParticles(const std::string& casefileName);
         void setupParticleGrid();
-        void calcParticleDensities();
-        void calcParticleForces();
-        void stepParticles(double dt);
-        double getCFLTimestep(double multiplier);
-        void printParameters();
+        virtual double getCFLTimestep(double multiplier);
+        virtual void calcParticleDensities();
+        virtual void calcParticleForces();
+        virtual void stepParticles(double dt);
+        virtual void printParameters();
         SPH(int d,
-            double rd,
-            double dv,
-            double s,
-            double ai,
+            double rho0,
+            double eta,
             double g,
-            EquationOfState *eos,
             SphKernel *kernel,
-            double fps,
-            double bps,
-            double sl,
+            double fluidSpacing,
+            double boundarySpacing,
+            double h,
             BoundaryConditions bc);
-        ~SPH();
+        virtual ~SPH();
 
-    private:
+    protected:
         int dimensions;
         double restDensity;
+        double pressureConstant;
         double dynamicViscosity;
-        double stiffness;
-        double adiabaticIndex;
         double extGravity;
         EquationOfState *eos;
         SphKernel *kernel;
@@ -69,6 +65,47 @@ class SPH
         void initCoordOffsetArray();
         void resizeGrid();
         void projectParticlesToGrid();
+};
+
+class WCSPH: public SPH
+{
+    public:
+        void printParameters();
+        double getCFLTimestep(double multiplier);
+        WCSPH(int d,
+              double rho0,
+              double eta,
+              double g,
+              SphKernel *kernel,
+              double fluidSpacing,
+              double boundarySpacing,
+              double h,
+              BoundaryConditions bc,
+              double maxH,
+              double rhoVar);
+
+    private:
+        double densityVariation;
+        double soundSpeed;
+};
+
+class ThermoSPH: public SPH
+{
+    public:
+        void printParameters();
+        ThermoSPH(int d,
+                  double rho0,
+                  double eta,
+                  double g,
+                  SphKernel *kernel,
+                  double fluidSpacing,
+                  double boundarySpacing,
+                  double h,
+                  BoundaryConditions bc,
+                  double gamma);
+
+    private:
+        double adiabaticIndex;
 };
 
 #endif

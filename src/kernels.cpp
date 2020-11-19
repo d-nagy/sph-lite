@@ -51,7 +51,7 @@ double CubicSplineKernel::W(double r, double h)
 
 double CubicSplineKernel::gradWComponent(double xi, double xj, double r, double h)
 {
-    return delW(r, h) * (xi - xj) / (r * h);
+    return (r > 1e-12) ? delW(r, h) * (xi - xj) / (r * h) : 0;
 }
 
 inline double CubicSplineKernel::getSupportRadius(double h)
@@ -61,6 +61,8 @@ inline double CubicSplineKernel::getSupportRadius(double h)
 
 double CubicSplineKernel::delW(double r, double h)
 {
+    if (r < 1e-12) { return 0; }
+
     double q = r/h;
     double result = normalFactors[dims-1] / powerH(h, dims);
 

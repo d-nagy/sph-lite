@@ -128,7 +128,7 @@ void SPH::calcParticleDensities()
 // is computed using the symmetric SPH formula.
 void SPH::calcParticleForces()
 {
-    double gradWNorm, gradWComponent;
+    double gradWNorm, gradWComponent, gradW[3];
     double mass, dist, opPOverRhoSquared, nbrPOverRhoSquared, nbrPressure;
 
     int nMax = particles.size();
@@ -153,25 +153,28 @@ void SPH::calcParticleForces()
             Particle &nbr = particles[pNbr];
             dist = op.neighbourDist[i++];
 
-            if (&op != &nbr)
+            gradWNorm = 0;
+            mass = (nbr.isBoundary) ? boundaryParticleMass : fluidParticleMass;
+            nbrPressure = (nbr.isBoundary) ? op.pressure : nbr.pressure;
+            nbrPOverRhoSquared = nbrPressure / (nbr.density * nbr.density);
+
+            for (int d=0; d<dimensions; d++)
             {
-                gradWNorm = 0;
-                mass = (nbr.isBoundary) ? boundaryParticleMass : fluidParticleMass;
-                nbrPressure = (nbr.isBoundary) ? op.pressure : nbr.pressure;
-                nbrPOverRhoSquared = nbrPressure / (nbr.density * nbr.density); // Should nbr.density be op.density for boundary nbrs?
+                gradWComponent = kernel->gradWComponent(op.x[d], nbr.x[d], dist, smoothingLength);
+                gradWNorm += gradWComponent * gradWComponent;
+                gradW[d] = gradWComponent;
 
-                // Add acceleration from pressure and calculate kernel gradient
-                for (int d=0; d<dimensions; d++)
-                {
-                    gradWComponent = kernel->gradWComponent(op.x[d], nbr.x[d], dist, smoothingLength);
-                    gradWNorm += gradWComponent * gradWComponent;
-                    op.a[d] -= mass * (opPOverRhoSquared + nbrPOverRhoSquared) * gradWComponent;
-                    op.energyPerMassDerivative += mass * (opPOverRhoSquared + nbrPOverRhoSquared) * (op.v[d] - nbr.v[d]) * gradWComponent / 2;
-                }
+                // Add acceleration from pressure
+                op.a[d] -= mass * (opPOverRhoSquared + nbrPOverRhoSquared) * gradWComponent;
 
-                gradWNorm = sqrt(gradWNorm);
+                // Update energy per mass derivative
+                op.energyPerMassDerivative += mass * (opPOverRhoSquared + nbrPOverRhoSquared) * (op.v[d] - nbr.v[d]) * gradWComponent / 2;
+            }
 
-                // Add acceleration from viscosity
+            gradWNorm = sqrt(gradWNorm);
+
+            if (!nbr.isBoundary && dist > 1e-12)
+            {
                 for (int d=0; d<dimensions; d++)
                 {
                     op.a[d] += (mass * 2 * gradWNorm * dynamicViscosity) * (nbr.v[d] - op.v[d]) / (op.density * nbr.density * dist);
@@ -180,6 +183,44 @@ void SPH::calcParticleForces()
         }
     }
 }
+
+// void SPH::addViscosityAcceleration(Particle& op, const Particle& nbr, const double (&gradW)[3], const double dist, const double mass)
+// {
+//     double gradWNorm = 0;
+//     for (int d=0; d<dimensions; d++)
+//     {
+//         gradWNorm += gradW[d]*gradW[d];
+//     }
+
+//     gradWNorm = sqrt(gradWNorm);
+
+//     if (dist > 1e-12)
+//     {
+//         for (int d=0; d<dimensions; d++)
+//         {
+//             op.a[d] += (mass * 2 * gradWNorm * dynamicViscosity) * (nbr.v[d] - op.v[d]) / (op.density * nbr.density * dist);
+//         }
+//     }
+// }
+
+// void WCSPH::addViscosityAcceleration(Particle& op, const Particle& nbr, const double (&gradW)[3], const double dist, const double mass)
+// {
+//     double dvDotdx = 0;
+//     for (int d=0; d<dimensions; d++)
+//     {
+//         dvDotdx += (op.v[d] - nbr.v[d]) * (op.x[d] - nbr.x[d]);
+//     }
+
+//     if (dvDotdx < 0)
+//     {
+//         double viscousTerm = 2 * viscosityAlpha * smoothingLength * soundSpeed / (op.density + nbr.density);
+//         double capitalPi = -viscousTerm * dvDotdx / (dist*dist + 0.01*smoothingLength*smoothingLength);
+//         for (int d=0; d<dimensions; d++)
+//         {
+//             op.a[d] -= mass * capitalPi * gradW[d];
+//         }
+//     }
+// }
 
 // Move particles
 // Semi-implicit Euler scheme
@@ -260,6 +301,11 @@ void SPH::stepParticles(double dt)
 double SPH::getCFLTimestep(double multiplier)
 {
     return multiplier * fluidParticleSize / sqrt(maxSpeedSquared);
+}
+
+double WCSPH::getCFLTimestep(double multiplier)
+{
+    return multiplier * fluidParticleSize / soundSpeed;
 }
 
 // Resize grid and project particles to it
@@ -346,9 +392,9 @@ int SPH::initialiseParticles(const std::string& casefileName)
         return 0;
     }
 
-    std::cout << "Number of fluid particles: " << numFluidParticles << std::endl
-              << "Number of boundary particles: " << numBoundaryParticles << std::endl
-              << "Total number of particles: " << numParticles << std::endl;
+    std::cout << "\tFluid particles:        " << numFluidParticles << std::endl
+              << "\tBoundary particles:     " << numBoundaryParticles << std::endl
+              << "\tTotal particles:        " << numParticles << std::endl;
 
     return 1;
 }
@@ -431,53 +477,104 @@ void SPH::printParameters()
             break;
     }
 
-    std::cout << "Dimensions: " << dimensions << std::endl
-              << "Rest density: " << restDensity << std::endl
-              << "Dynamic viscosity: " << dynamicViscosity << std::endl
-              << "Stiffness coefficient: " << stiffness << std::endl
-              << "Adiabatic index: " << adiabaticIndex << std::endl
-              << "External gravitational acceleration: " << extGravity << std::endl
-              << "Equation of state: " << *eos << std::endl
-              << "Fluid particle size: " << fluidParticleSize << std::endl
-              << "Boundary particle size: " << boundaryParticleSize << std::endl
-              << "Smoothing length: " << smoothingLength << std::endl
-              << "SPH kernel: " << *kernel << std::endl
-              << "Fluid particle mass: " << fluidParticleMass << std::endl
-              << "Boundary particle mass: " << boundaryParticleMass << std::endl
-              << "Boundary conditions: " << bcString << std::endl;
+    std::cout << "STANDARD SPH PARAMETERS:" << std::endl
+              << "\tDimensions:             " << dimensions << std::endl
+              << "\tRest density:           " << restDensity << std::endl
+              << "\tPressure constant:      " << pressureConstant << std::endl
+              << "\tDynamic viscosity:      " << dynamicViscosity << std::endl
+              << "\tExternal gravity:       " << extGravity << std::endl
+              << "\tEquation of state:      " << *eos << std::endl
+              << "\tFluid particle size:    " << fluidParticleSize << std::endl
+              << "\tBoundary particle size: " << boundaryParticleSize << std::endl
+              << "\tSmoothing length:       " << smoothingLength << std::endl
+              << "\tSPH kernel:             " << *kernel << std::endl
+              << "\tFluid particle mass:    " << fluidParticleMass << std::endl
+              << "\tBoundary particle mass: " << boundaryParticleMass << std::endl
+              << "\tBoundary conditions:    " << bcString << std::endl;
+}
+
+void WCSPH::printParameters()
+{
+    SPH::printParameters();
+
+    std::cout << std::endl << "WCSPH PARAMETERS:" << std::endl
+              << "\tDensity variation:      " << densityVariation << std::endl
+              << "\tSound speed:            " << soundSpeed << std::endl;
+}
+
+void ThermoSPH::printParameters()
+{
+    SPH::printParameters();
+
+    std::cout << std::endl << "ThermoSPH PARAMETERS:" << std::endl
+              << "\tAdiabatic index:        " << adiabaticIndex << std::endl;
 }
 
 SPH::SPH(int d,
-         double rd,
-         double dv,
-         double s,
-         double ai,
+         double rho0,
+         double eta,
          double g,
-         EquationOfState *eos,
          SphKernel *kernel,
-         double fps,
-         double bps,
-         double sl,
+         double fluidSpacing,
+         double boundarySpacing,
+         double h,
          BoundaryConditions bc)
 {
     dimensions = d;
-    restDensity = rd;
-    dynamicViscosity = dv;
-    stiffness = s;
-    adiabaticIndex = ai;
+    restDensity = rho0;
+    dynamicViscosity = eta;
     extGravity = g;
-    this->eos = eos;
     this->kernel = kernel;
-    fluidParticleSize = fps;
-    boundaryParticleSize = bps;
-    smoothingLength = sl;
+    fluidParticleSize = fluidSpacing;
+    boundaryParticleSize = boundarySpacing;
+    smoothingLength = h;
     boundaryConditions = bc;
-    gridNbrhoodSize = pow(3, dimensions);
 
+    gridNbrhoodSize = pow(3, dimensions);
     fluidParticleMass = restDensity * pow(fluidParticleSize, dimensions);
-    boundaryParticleMass = restDensity * pow(boundaryParticleMass, dimensions);
+    boundaryParticleMass = restDensity * pow(boundaryParticleSize, dimensions);
 
     initCoordOffsetArray();
+}
+
+WCSPH::WCSPH(int d,
+             double rho0,
+             double eta,
+             double g,
+             SphKernel *kernel,
+             double fluidSpacing,
+             double boundarySpacing,
+             double h,
+             BoundaryConditions bc,
+             double maxH,
+             double rhoVar)
+    : SPH(d, rho0, eta, g, kernel, fluidSpacing, boundarySpacing, h, bc)
+{
+    boundaryConditions = bc;
+    densityVariation = rhoVar;
+
+    double soundSpeedSquared = 2 * abs(g) * maxH / rhoVar;
+    pressureConstant = rho0 * soundSpeedSquared / 7;
+    soundSpeed = sqrt(soundSpeedSquared);
+
+    this->eos = new WeaklyCompressibleEOS(pressureConstant, rho0);
+}
+
+ThermoSPH::ThermoSPH(int d,
+                     double rho0,
+                     double eta,
+                     double g,
+                     SphKernel *kernel,
+                     double fluidSpacing,
+                     double boundarySpacing,
+                     double h,
+                     BoundaryConditions bc,
+                     double gamma)
+    : SPH(d, rho0, eta, g, kernel, fluidSpacing, boundarySpacing, h, bc)
+{
+    adiabaticIndex = gamma;
+
+    this->eos = new IdealGasEOS(gamma);
 }
 
 SPH::~SPH()

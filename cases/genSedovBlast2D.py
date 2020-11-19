@@ -4,7 +4,7 @@ import numpy as np
 def gaussianKernel(x, y, sig):
     return np.exp(-(x**2 + y**2) / (2 * sig**2)) / (2 * np.pi * sig**2)
 
-inputFilename = '../sph.dat'
+inputFilename = '../sedov.dat'
 outputFilename = 'sedovBlast2D.case'
 params = []
 inputLines = []
@@ -14,11 +14,11 @@ with open(inputFilename) as f:
     params = [line.strip().split() for line in inputLines]
     params = [line[0] for line in params if line]
 
-fluidParticleSize = float(params[7])
+fluidParticleSize = float(params[4])
 restDensity = float(params[1])
-h = float(params[9])
-kernel = params[10]
-gamma = float(params[4])
+h = float(params[6])
+kernel = params[7]
+gamma = float(params[10])
 energySpike = 0.1
 spikeRadius = 0.08 # fluidParticleSize * 1.2
 bgdU = 1e-5 / (restDensity * (gamma - 1))
@@ -55,10 +55,6 @@ with open(outputFilename, 'w') as f:
     f.write(f'{domainMin} {domainMin} 0 {domainMax} {domainMax} 0\n')
     for p in fluid:
         f.write(' '.join(list(map(str, p))) + '\n')
-
-outputLines = inputLines[:-1] + [outputFilename + '\n']
-with open(inputFilename, 'w') as f:
-    f.writelines(outputLines)
 
 xs = [p[0] for p in fluid]
 ys = [p[1] for p in fluid]

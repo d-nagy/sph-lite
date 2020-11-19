@@ -25,7 +25,6 @@ IdealGasEOS::IdealGasEOS(double gamma) : gamma(gamma)
     description = "Ideal Gas";
 }
 
-
 double IdealGasEOS::getPressure(Particle& p)
 {
     return p.density * p.energyPerMass * (gamma - 1);

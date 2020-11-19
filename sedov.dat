@@ -1,0 +1,18 @@
+2               # Dimensions
+1               # Rest density
+0.00001         # Dynamic viscosity (kg/ms)
+0               # External gravitational acceleration
+0.01            # Fluid particle size / spacing (m)
+0.01            # Boundary particle size / spacing (m)
+0.02            # Smoothing length (m)
+cubicspline     # SPH kernel
+periodic        # Boundary handling
+thermosph       # SPH scheme
+1.666           # Adiabatic index
+0.00001         # Timestep (s)
+0.0000005         # Minimum timestep size
+0.001           # Maximum timestep size
+0.2             # CFL lambda multiplier
+0.004           # Plot interval (s)
+0.16            # End time (s)
+sedovBlast2D.case

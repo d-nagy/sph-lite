@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-inputFilename = '../sph.dat'
+inputFilename = '../dambreak.dat'
 outputFilename = 'damBreak2D.case'
 params = []
 inputLines = []
@@ -11,7 +11,7 @@ with open(inputFilename) as f:
     params = [line.strip().split() for line in inputLines]
     params = [line[0] for line in params if line]
 
-fluidParticleSize, boundaryParticleSize, smoothingLength = float(params[7]), float(params[8]), float(params[9])
+fluidParticleSize, boundaryParticleSize, smoothingLength = float(params[4]), float(params[5]), float(params[6])
 restDensity = float(params[1])
 boundaryWidth = int(np.ceil(smoothingLength*2 / boundaryParticleSize))
 
@@ -53,10 +53,6 @@ with open(outputFilename, 'w') as f:
     f.write('-0.2 -0.2 0 1.2 1 0\n')
     for p in boundaryParticles + fluid:
         f.write(' '.join(list(map(str, p))) + '\n')
-
-outputLines = inputLines[:-1] + [outputFilename + '\n']
-with open(inputFilename, 'w') as f:
-    f.writelines(outputLines)
 
 bxs = [p[0] for p in boundaryParticles]
 bys = [p[1] for p in boundaryParticles]
