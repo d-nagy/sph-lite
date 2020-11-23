@@ -1,7 +1,7 @@
 IDIR=include
 
-CXX=g++
-CXXFLAGS=-I$(IDIR)
+CXX=clang++
+CXXFLAGS=-I$(IDIR) -std=c++2a -Wall -Wextra -Wpedantic
 
 SDIR=src
 ODIR=$(SDIR)/obj

@@ -8,31 +8,37 @@
 class SphKernel
 {
     public:
-        virtual double W(double r, double h) = 0;
-        virtual double gradWComponent(double xi, double xj, double r, double h) = 0;
-        virtual inline double getSupportRadius(double h) = 0;
+        virtual double W(const double r, const double h) = 0;
+        virtual double gradWComponent(const double xi,
+                                      const double xj,
+                                      const double r,
+                                      const double h) = 0;
+        virtual inline double getSupportRadius(const double h) = 0;
         virtual ~SphKernel() {};
         friend std::ostream& operator<<(std::ostream &out, const SphKernel &kernel);
 
     protected:
         std::string description;
-        virtual double delW(double r, double h) = 0;
-        double powerH(double h, int d);
+        virtual double delW(const double r, const double h) = 0;
+        double powerH(const double h, const int d);
 };
 
 class CubicSplineKernel: public SphKernel
 {
     public:
-        CubicSplineKernel(int d);
-        double W(double r, double h);
-        double gradWComponent(double xi, double xj, double r, double h);
-        double getSupportRadius(double h);
-        void plotKernel(double h);
+        CubicSplineKernel(const int d);
+        double W(const double r, const double h);
+        double gradWComponent(const double xi,
+                              const double xj,
+                              const double r,
+                              const double h);
+        double getSupportRadius(const double h);
+        void plotKernel(const double h);
 
     private:
         int dims;
         const double normalFactors[3] = {2.0/3.0, 10.0/(7*M_PI), 1/M_PI};
-        double delW(double r, double h);
+        double delW(const double r, const double h);
 };
 
 #endif

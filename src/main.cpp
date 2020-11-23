@@ -13,25 +13,23 @@
 #include <sstream>
 #include <stdlib.h>
 
-#define max(x, y) ((x > y) ? x : y)
-#define min(x, y) ((x > y) ? y : x)
-
 const std::string caseDir = "./cases/";
 const std::string outputDir = "./output/";
 std::string casefileName;
 
-int dimensions;
 double t, tFinal, tPlot, deltaT, minDeltaT, maxDeltaT, deltaTPlot, cflLambda, cflT;
-double fpMass, bpMass, fpSize, bpSize;
-double restDensity, dynamicViscosity, gravity, smoothingLength;
-double adiabaticIndex, maxHeight, densityVariation;
-BoundaryConditions boundaryConditions;
-SphKernel *kernel;
 SPH *sphSim;
 
 // Read and initialise all parameters from input file, with some validation.
 int readParameters(const std::string& paramfileName)
 {
+    int dimensions;
+    double fpSize, bpSize;
+    double restDensity, dynamicViscosity, gravity, smoothingLength;
+    double adiabaticIndex, maxHeight, densityVariation;
+    BoundaryConditions boundaryConditions;
+    SphKernel *kernel;
+
     std::string line, kernelString, bcString, schemeString;
     std::ifstream paramFile (paramfileName);
     std::stringstream linestream;
@@ -43,7 +41,7 @@ int readParameters(const std::string& paramfileName)
         linestream >> dimensions;
         if (dimensions < 1 || dimensions > 3)
         {
-            std::cout << "ERROR: Invalid number of dimensions given: " << dimensions << std::endl;
+            std::cout << "ERROR: Invalid number of dimensions given: " << dimensions << '\n';
             return 0;
         }
 
@@ -80,7 +78,7 @@ int readParameters(const std::string& paramfileName)
         }
         else
         {
-            std::cout << "ERROR: Unknown kernel specified: \"" << kernelString << "\"" << std::endl;
+            std::cout << "ERROR: Unknown kernel specified: \"" << kernelString << "\"" << '\n';
             return 0;
         }
 
@@ -97,7 +95,7 @@ int readParameters(const std::string& paramfileName)
         }
         else
         {
-            std::cout << "ERROR: Unknown boundary conditions specified: \"" << bcString << "\"" << std::endl;
+            std::cout << "ERROR: Unknown boundary conditions specified: \"" << bcString << "\"" << '\n';
             return 0;
         }
 
@@ -145,7 +143,7 @@ int readParameters(const std::string& paramfileName)
         }
         else
         {
-            std::cout << "ERROR: Unknown SPH scheme specified: \"" << schemeString << "\"" << std::endl;
+            std::cout << "ERROR: Unknown SPH scheme specified: \"" << schemeString << "\"" << '\n';
             return 0;
         }
 
@@ -177,12 +175,12 @@ int readParameters(const std::string& paramfileName)
         casefileName = line;
 
         paramFile.close();
-        std::cout << "All parameters read successfully." << std::endl;
+        std::cout << "All parameters read successfully." << '\n';
         return 1;
     }
     else
     {
-        std::cout << "ERROR: Unable to open parameters file." << std::endl;
+        std::cout << "ERROR: Unable to open parameters file." << '\n';
         return 0;
     }
 }
@@ -193,7 +191,7 @@ int main(int argc, char** argv)
 
     if (argc < 2)
     {
-        std::cout << "ERROR: Expected 1 argument (paramfileName), got 0." << std::endl;
+        std::cout << "ERROR: Expected 1 argument (paramfileName), got 0." << '\n';
         return 1;
     }
 
@@ -202,14 +200,14 @@ int main(int argc, char** argv)
     VTKResultsWriter vtkout(outputDir);
 
     sphSim->printParameters();
-    std::cout << std::endl << "SIMULATION PARAMETERS:" << std::endl
-              << "\tInitial timestep:       " << deltaT << std::endl
-              << "\tMinimum timestep:       " << minDeltaT << std::endl
-              << "\tMaximum timestep:       " << maxDeltaT << std::endl
-              << "\tCFL multiplier:         " << cflLambda << std::endl
-              << "\tPlot interval:          " << deltaTPlot << std::endl
-              << "\tFinal time:             " << tFinal << std::endl
-              << "\tCase file:              " << casefileName << std::endl;
+    std::cout << '\n' << "SIMULATION PARAMETERS:" << '\n'
+              << "\tInitial timestep:       " << deltaT << '\n'
+              << "\tMinimum timestep:       " << minDeltaT << '\n'
+              << "\tMaximum timestep:       " << maxDeltaT << '\n'
+              << "\tCFL multiplier:         " << cflLambda << '\n'
+              << "\tPlot interval:          " << deltaTPlot << '\n'
+              << "\tFinal time:             " << tFinal << '\n'
+              << "\tCase file:              " << casefileName << '\n';
 
     t = 0.0;
     tPlot = t + deltaTPlot;
@@ -221,8 +219,8 @@ int main(int argc, char** argv)
 
     // Plot initial state
     vtkout.writeSnapshot(sphSim->particles);
-    std::cout << std::endl << "Time: " << t << "\t"
-              << "max speed: " << sqrt(sphSim->maxSpeedSquared) << std::endl;
+    std::cout << '\n' << "Time: " << t << "\t"
+              << "max speed: " << sqrt(sphSim->maxSpeedSquared) << '\n';
 
     while (t <= tFinal)
     {
@@ -236,21 +234,23 @@ int main(int argc, char** argv)
             // Plot state of the system
             vtkout.writeSnapshot(sphSim->particles);
             std::cout << "Time: " << t << "\t"
-                      << "max speed: " << sqrt(sphSim->maxSpeedSquared) << std::endl;
+                      << "max speed: " << sqrt(sphSim->maxSpeedSquared) << '\n';
             tPlot += deltaTPlot;
         }
         t += deltaT;
 
         cflT = sphSim->getCFLTimestep(cflLambda);
-        deltaT = (deltaTPlot > 0) ? min(tPlot - t, cflT) : cflT;
-        deltaT = max(minDeltaT, deltaT);
-        deltaT = min(maxDeltaT, deltaT);
+        if (deltaTPlot > 0)
+        {
+            deltaT = (tPlot - t < cflT) ? tPlot - t : cflT;
+        }
+        deltaT = (deltaT < minDeltaT) ? minDeltaT : (maxDeltaT > deltaT) ? maxDeltaT : deltaT;
     }
 
     // Plot final state of the system
     vtkout.writeSnapshot(sphSim->particles);
     std::cout << "Time: " << t << "\t"
-              << "max speed: " << sqrt(sphSim->maxSpeedSquared) << std::endl;
+              << "max speed: " << sqrt(sphSim->maxSpeedSquared) << '\n';
 
     delete sphSim;
 }

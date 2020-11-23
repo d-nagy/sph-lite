@@ -3,13 +3,14 @@
 #define PARTICLE_H
 
 #include <vector>
+#include <array>
 
 class Particle
 {
     public:
         bool isBoundary = false;
         bool isActive = true;
-        double x[3], v[3], a[3];
+        std::array<double, 3> x, v, a;
         double pressure, density, energyPerMass, energyPerMassDerivative;
         std::vector<int> neighbours;
         std::vector<double> neighbourDist;

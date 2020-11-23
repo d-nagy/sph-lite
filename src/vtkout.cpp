@@ -11,15 +11,15 @@
 VTKResultsWriter::VTKResultsWriter(const std::string& outputDir) : outputDir(outputDir)
 {
     videoFile.open(outputDir + "result.pvd");
-    videoFile << "<?xml version=\"1.0\"?>" << std::endl
-              << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">" << std::endl
+    videoFile << "<?xml version=\"1.0\"?>" << '\n'
+              << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">" << '\n'
               << "<Collection>";
 }
 
 VTKResultsWriter::~VTKResultsWriter()
 {
     videoFile << "</Collection>"
-              << "</VTKFile>" << std::endl;
+              << "</VTKFile>" << '\n';
     videoFile.close();
 }
 
@@ -31,10 +31,10 @@ void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
 
     std::ofstream out(outputDir + filename.str().c_str());
 
-    out << "<VTKFile type=\"PolyData\">" << std::endl
-        << "<PolyData>" << std::endl
-        << " <Piece NumberOfPoints=\"" << ps.size() << "\">" << std::endl
-        << "  <Points>" << std::endl
+    out << "<VTKFile type=\"PolyData\">" << '\n'
+        << "<PolyData>" << '\n'
+        << " <Piece NumberOfPoints=\"" << ps.size() << "\">" << '\n'
+        << "  <Points>" << '\n'
         << "   <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">";
         // << "   <DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">";
 
@@ -47,10 +47,10 @@ void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
         }
     }
 
-    out << "   </DataArray>" << std::endl
-        << "  </Points>" << std::endl
-        << "  <PointData>" << std::endl
-        << "   <DataArray type=\"Float64\" Name=\"Density\" format=\"ascii\">" << std::endl;
+    out << "   </DataArray>" << '\n'
+        << "  </Points>" << '\n'
+        << "  <PointData>" << '\n'
+        << "   <DataArray type=\"Float64\" Name=\"Density\" format=\"ascii\">" << '\n';
 
     // Output particle densities
     for (auto &p : ps)
@@ -58,8 +58,8 @@ void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
         out << p.density << " ";
     }
 
-    out << "   </DataArray>" << std::endl
-        << "   <DataArray type=\"Float64\" Name=\"Pressure\" format=\"ascii\">" << std::endl;
+    out << "   </DataArray>" << '\n'
+        << "   <DataArray type=\"Float64\" Name=\"Pressure\" format=\"ascii\">" << '\n';
 
     // Output particle pressures
     for (auto &p : ps)
@@ -67,8 +67,8 @@ void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
         out << p.pressure << " ";
     }
 
-    out << "   </DataArray>" << std::endl
-        << "   <DataArray type=\"Float64\" Name=\"EnergyPerMass\" format=\"ascii\">" << std::endl;
+    out << "   </DataArray>" << '\n'
+        << "   <DataArray type=\"Float64\" Name=\"EnergyPerMass\" format=\"ascii\">" << '\n';
 
     // Output particle internal energy per mass
     for (auto &p : ps)
@@ -76,8 +76,8 @@ void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
         out << p.energyPerMass << " ";
     }
 
-    out << "   </DataArray>" << std::endl
-        << "   <DataArray type=\"Int32\" Name=\"CellNumber\" format=\"ascii\">" << std::endl;
+    out << "   </DataArray>" << '\n'
+        << "   <DataArray type=\"Int32\" Name=\"CellNumber\" format=\"ascii\">" << '\n';
 
     // Output particle internal energy per mass
     for (auto &p : ps)
@@ -85,13 +85,13 @@ void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
         out << p.gridCellNo % 10 << " ";
     }
 
-    out << "   </DataArray>" << std::endl
-        << "  </PointData>" << std::endl
-        << " </Piece>" << std::endl
-        << "</PolyData>" << std::endl
-        << "</VTKFile>"  << std::endl;
+    out << "   </DataArray>" << '\n'
+        << "  </PointData>" << '\n'
+        << " </Piece>" << '\n'
+        << "</PolyData>" << '\n'
+        << "</VTKFile>"  << '\n';
 
     out.close();
 
-    videoFile << "<DataSet timestep=\"" << counter << "\" group=\"\" part=\"0\" file=\"" << filename.str() << "\"/>" << std::endl;
+    videoFile << "<DataSet timestep=\"" << counter << "\" group=\"\" part=\"0\" file=\"" << filename.str() << "\"/>" << '\n';
 }

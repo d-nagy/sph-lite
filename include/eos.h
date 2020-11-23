@@ -21,7 +21,7 @@ class EquationOfState
 class WeaklyCompressibleEOS: public EquationOfState
 {
     public:
-        WeaklyCompressibleEOS(double k, double rho0);
+        WeaklyCompressibleEOS(const double k, const double rho0);
         double getPressure(Particle& p);
 
     private:
@@ -31,7 +31,7 @@ class WeaklyCompressibleEOS: public EquationOfState
 class IdealGasEOS: public EquationOfState
 {
     public:
-        IdealGasEOS(double gamma);
+        IdealGasEOS(const double gamma);
         double getPressure(Particle& p);
 
     private:

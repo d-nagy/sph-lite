@@ -7,92 +7,89 @@ std::ostream& operator<<(std::ostream &out, const SphKernel &kernel)
     return out;
 }
 
-double SphKernel::powerH(double h, int d)
+double SphKernel::powerH(const double h, const int d)
 {
     double result = h;
     switch (d)
     {
         case 2:
-            result *= h;
+            return result * h;
             break;
         case 3:
-            result *= h*h;
+            return result * h*h;
         default:
-            break;
+            return result;
     }
-    return result;
 }
 
-CubicSplineKernel::CubicSplineKernel(int d) : dims(d)
+CubicSplineKernel::CubicSplineKernel(const int d) : dims(d)
 {
     description = "Cubic Spline";
 }
 
-double CubicSplineKernel::W(double r, double h)
+double CubicSplineKernel::W(const double r, const double h)
 {
-    double q = r/h;
+    const double q = r/h;
     double result = normalFactors[dims-1] / powerH(h, dims);
 
     if (q >= 2)
     {
-        result *= 0;
+        return result * 0;
     }
     else if (q >= 1)
     {
-        result *= (0.25 * (2 - q)*(2 - q)*(2 - q));
+        return result * (0.25 * (2 - q)*(2 - q)*(2 - q));
     }
     else
     {
-        result *= (1 - 1.5*q*q*(1 - q/2));
+        return result * (1 - 1.5*q*q*(1 - q/2));
     }
-
-    return result;
 }
 
-double CubicSplineKernel::gradWComponent(double xi, double xj, double r, double h)
+double CubicSplineKernel::gradWComponent(const double xi,
+                                         const double xj,
+                                         const double r,
+                                         const double h)
 {
     return (r > 1e-12) ? delW(r, h) * (xi - xj) / (r * h) : 0;
 }
 
-inline double CubicSplineKernel::getSupportRadius(double h)
+inline double CubicSplineKernel::getSupportRadius(const double h)
 {
     return 2 * h;
 }
 
-double CubicSplineKernel::delW(double r, double h)
+double CubicSplineKernel::delW(const double r, const double h)
 {
     if (r < 1e-12) { return 0; }
 
-    double q = r/h;
+    const double q = r/h;
     double result = normalFactors[dims-1] / powerH(h, dims);
 
     if (q >= 2)
     {
-        result *= 0;
+        return result * 0;
     }
     else if (q >= 1)
     {
-        result *= (-0.75 * ((2 - q)*(2 - q)));
+        return result * (-0.75 * ((2 - q)*(2 - q)));
     }
     else
     {
-        // result *= (3 * (((2 - q)*(2 - q)/-4.0) + ((1 - q)*(1 - q))));
-        result *= (0.75*q * (3*q - 4));
+        return result * (0.75*q * (3*q - 4));
     }
-
-    return result;
 }
 
-void CubicSplineKernel::plotKernel(double h)
+void CubicSplineKernel::plotKernel(const double h)
 {
-    std::cout << "h=" << h << std::endl;
-    std::cout << "q," << "W," << "dW" << std::endl;
+    std::cout << "h=" << h << '\n';
+    std::cout << "q," << "W," << "dW" << '\n';
 
     double maxR = 2*h;
-    double dq = 2*h / 100;
+    const double dq = 2*h / 100;
     maxR += dq;
     for (double r=0.0; r<maxR; r+=dq)
     {
-        std::cout << r/h << "," << W(r, h) << "," << delW(r, h) << std::endl;
+        std::cout << r/h << "," << W(r, h) << "," << delW(r, h) << '\n';
     }
 }

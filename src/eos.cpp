@@ -10,7 +10,7 @@ std::ostream& operator<<(std::ostream &out, const EquationOfState &eos)
     return out;
 }
 
-WeaklyCompressibleEOS::WeaklyCompressibleEOS(double k, double rho0) : k(k), rho0(rho0)
+WeaklyCompressibleEOS::WeaklyCompressibleEOS(const double k, const double rho0) : k(k), rho0(rho0)
 {
     description = "Weakly Compressible";
 }
@@ -20,7 +20,7 @@ double WeaklyCompressibleEOS::getPressure(Particle& p)
     return k * (pow((p.density/rho0), 7) - 1);
 }
 
-IdealGasEOS::IdealGasEOS(double gamma) : gamma(gamma)
+IdealGasEOS::IdealGasEOS(const double gamma) : gamma(gamma)
 {
     description = "Ideal Gas";
 }

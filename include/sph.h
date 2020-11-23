@@ -22,10 +22,10 @@ class SPH
         std::vector<Particle> particles;
         int initialiseParticles(const std::string& casefileName);
         void setupParticleGrid();
-        virtual double getCFLTimestep(double multiplier);
+        virtual double getCFLTimestep(const double multiplier);
         virtual void calcParticleDensities();
         virtual void calcParticleForces();
-        virtual void stepParticles(double dt);
+        virtual void stepParticles(const double dt);
         virtual void printParameters();
         SPH(int d,
             double rho0,
@@ -51,7 +51,7 @@ class SPH
         double smoothingLength;
         double fluidParticleMass;
         double boundaryParticleMass;
-        int* coordOffsets;
+        std::vector<int> coordOffsets;
         int gridDims[3];
         int gridNbrhoodSize;
         int dimFactors[3];
@@ -71,7 +71,7 @@ class WCSPH: public SPH
 {
     public:
         void printParameters();
-        double getCFLTimestep(double multiplier);
+        double getCFLTimestep(const double multiplier);
         WCSPH(int d,
               double rho0,
               double eta,
