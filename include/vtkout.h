@@ -9,16 +9,19 @@
 #include <vector>
 #include <fstream>
 
-class VTKResultsWriter
+namespace SimOutput
 {
-    public:
-        VTKResultsWriter(const std::string& outputDir);
-        ~VTKResultsWriter();
-        void writeSnapshot(const std::vector<Particle>& ps);
+    class VTKResultsWriter
+    {
+        public:
+            VTKResultsWriter(const std::string& outputDir);
+            ~VTKResultsWriter();
+            void writeSnapshot(const std::vector<SphSchemes::Particle>& ps);
 
-    private:
-        std::string outputDir;
-        std::ofstream videoFile;
-};
+        private:
+            std::string outputDir;
+            std::ofstream videoFile;
+    };
+}
 
 #endif

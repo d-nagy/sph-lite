@@ -8,7 +8,7 @@
 #include <sstream>
 #include <algorithm>
 
-VTKResultsWriter::VTKResultsWriter(const std::string& outputDir) : outputDir(outputDir)
+SimOutput::VTKResultsWriter::VTKResultsWriter(const std::string& outputDir) : outputDir(outputDir)
 {
     videoFile.open(outputDir + "result.pvd");
     videoFile << "<?xml version=\"1.0\"?>" << '\n'
@@ -16,14 +16,14 @@ VTKResultsWriter::VTKResultsWriter(const std::string& outputDir) : outputDir(out
               << "<Collection>";
 }
 
-VTKResultsWriter::~VTKResultsWriter()
+SimOutput::VTKResultsWriter::~VTKResultsWriter()
 {
     videoFile << "</Collection>"
               << "</VTKFile>" << '\n';
     videoFile.close();
 }
 
-void VTKResultsWriter::writeSnapshot(const std::vector<Particle>& ps)
+void SimOutput::VTKResultsWriter::writeSnapshot(const std::vector<SphSchemes::Particle>& ps)
 {
     static int counter = -1;
     std::stringstream filename;

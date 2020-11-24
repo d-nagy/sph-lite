@@ -18,7 +18,7 @@ const std::string outputDir = "./output/";
 std::string casefileName;
 
 double t, tFinal, tPlot, deltaT, minDeltaT, maxDeltaT, deltaTPlot, cflLambda, cflT;
-SPH *sphSim;
+SphSchemes::SPH *sphSim;
 
 // Read and initialise all parameters from input file, with some validation.
 int readParameters(const std::string& paramfileName)
@@ -27,8 +27,8 @@ int readParameters(const std::string& paramfileName)
     double fpSize, bpSize;
     double restDensity, dynamicViscosity, gravity, smoothingLength;
     double adiabaticIndex, maxHeight, densityVariation;
-    BoundaryConditions boundaryConditions;
-    SphKernel *kernel;
+    SphSchemes::BoundaryConditions boundaryConditions;
+    SphKernels::SphKernel *kernel;
 
     std::string line, kernelString, bcString, schemeString;
     std::ifstream paramFile (paramfileName);
@@ -74,7 +74,7 @@ int readParameters(const std::string& paramfileName)
         linestream >> kernelString;
         if (kernelString.compare("cubicspline") == 0)
         {
-            kernel = new CubicSplineKernel(dimensions);
+            kernel = new SphKernels::CubicSplineKernel(dimensions);
         }
         else
         {
@@ -87,11 +87,11 @@ int readParameters(const std::string& paramfileName)
         linestream >> bcString;
         if (bcString.compare("periodic") == 0)
         {
-            boundaryConditions = periodic;
+            boundaryConditions = SphSchemes::BoundaryConditions::periodic;
         }
         else if (bcString.compare("destructive") == 0)
         {
-            boundaryConditions = destructive;
+            boundaryConditions = SphSchemes::BoundaryConditions::destructive;
         }
         else
         {
@@ -112,17 +112,17 @@ int readParameters(const std::string& paramfileName)
             linestream.str(line);
             linestream >> densityVariation;
 
-            sphSim = new WCSPH(dimensions,
-                               restDensity,
-                               dynamicViscosity,
-                               gravity,
-                               kernel,
-                               fpSize,
-                               bpSize,
-                               smoothingLength,
-                               boundaryConditions,
-                               maxHeight,
-                               densityVariation);
+            sphSim = new SphSchemes::WCSPH(dimensions,
+                                           restDensity,
+                                           dynamicViscosity,
+                                           gravity,
+                                           kernel,
+                                           fpSize,
+                                           bpSize,
+                                           smoothingLength,
+                                           boundaryConditions,
+                                           maxHeight,
+                                           densityVariation);
         }
         else if (schemeString.compare("thermosph") == 0)
         {
@@ -130,16 +130,16 @@ int readParameters(const std::string& paramfileName)
             linestream.str(line);
             linestream >> adiabaticIndex;
 
-            sphSim = new ThermoSPH(dimensions,
-                                   restDensity,
-                                   dynamicViscosity,
-                                   gravity,
-                                   kernel,
-                                   fpSize,
-                                   bpSize,
-                                   smoothingLength,
-                                   boundaryConditions,
-                                   adiabaticIndex);
+            sphSim = new SphSchemes::ThermoSPH(dimensions,
+                                               restDensity,
+                                               dynamicViscosity,
+                                               gravity,
+                                               kernel,
+                                               fpSize,
+                                               bpSize,
+                                               smoothingLength,
+                                               boundaryConditions,
+                                               adiabaticIndex);
         }
         else
         {
@@ -197,7 +197,7 @@ int main(int argc, char** argv)
 
     if (readParameters(argv[1]) == 0) return 1;
 
-    VTKResultsWriter vtkout(outputDir);
+    SimOutput::VTKResultsWriter vtkout(outputDir);
 
     sphSim->printParameters();
     std::cout << '\n' << "SIMULATION PARAMETERS:" << '\n'

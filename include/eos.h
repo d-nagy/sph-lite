@@ -7,35 +7,38 @@
 #include <iostream>
 #include <string>
 
-class EquationOfState
+namespace SphEOS
 {
-    public:
-        virtual double getPressure(Particle& p) = 0;
-        virtual ~EquationOfState() {};
-        friend std::ostream& operator<<(std::ostream &out, const EquationOfState &eos);
+    class EquationOfState
+    {
+        public:
+            virtual double getPressure(SphSchemes::Particle& p) = 0;
+            virtual ~EquationOfState() {};
+            friend std::ostream& operator<<(std::ostream &out, const EquationOfState &eos);
 
-    protected:
-        std::string description;
-};
+        protected:
+            std::string description;
+    };
 
-class WeaklyCompressibleEOS: public EquationOfState
-{
-    public:
-        WeaklyCompressibleEOS(const double k, const double rho0);
-        double getPressure(Particle& p);
+    class WeaklyCompressibleEOS: public EquationOfState
+    {
+        public:
+            WeaklyCompressibleEOS(const double k, const double rho0);
+            double getPressure(SphSchemes::Particle& p);
 
-    private:
-        double k, rho0;
-};
+        private:
+            double k, rho0;
+    };
 
-class IdealGasEOS: public EquationOfState
-{
-    public:
-        IdealGasEOS(const double gamma);
-        double getPressure(Particle& p);
+    class IdealGasEOS: public EquationOfState
+    {
+        public:
+            IdealGasEOS(const double gamma);
+            double getPressure(SphSchemes::Particle& p);
 
-    private:
-        double gamma;
-};
+        private:
+            double gamma;
+    };
+}
 
 #endif

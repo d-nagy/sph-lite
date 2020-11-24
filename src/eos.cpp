@@ -4,28 +4,28 @@
 #include <cmath>
 #include <iostream>
 
-std::ostream& operator<<(std::ostream &out, const EquationOfState &eos)
+std::ostream& SphEOS::operator<<(std::ostream &out, const SphEOS::EquationOfState &eos)
 {
     out << eos.description;
     return out;
 }
 
-WeaklyCompressibleEOS::WeaklyCompressibleEOS(const double k, const double rho0) : k(k), rho0(rho0)
+SphEOS::WeaklyCompressibleEOS::WeaklyCompressibleEOS(const double k, const double rho0) : k(k), rho0(rho0)
 {
     description = "Weakly Compressible";
 }
 
-double WeaklyCompressibleEOS::getPressure(Particle& p)
+double SphEOS::WeaklyCompressibleEOS::getPressure(SphSchemes::Particle& p)
 {
     return k * (pow((p.density/rho0), 7) - 1);
 }
 
-IdealGasEOS::IdealGasEOS(const double gamma) : gamma(gamma)
+SphEOS::IdealGasEOS::IdealGasEOS(const double gamma) : gamma(gamma)
 {
     description = "Ideal Gas";
 }
 
-double IdealGasEOS::getPressure(Particle& p)
+double SphEOS::IdealGasEOS::getPressure(SphSchemes::Particle& p)
 {
     return p.density * p.energyPerMass * (gamma - 1);
 }

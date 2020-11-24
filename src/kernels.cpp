@@ -1,13 +1,13 @@
 #include "kernels.h"
 #include <iostream>
 
-std::ostream& operator<<(std::ostream &out, const SphKernel &kernel)
+std::ostream& SphKernels::operator<<(std::ostream &out, const SphKernels::SphKernel &kernel)
 {
     out << kernel.description;
     return out;
 }
 
-double SphKernel::powerH(const double h, const int d)
+double SphKernels::SphKernel::powerH(const double h, const int d)
 {
     double result = h;
     switch (d)
@@ -22,12 +22,12 @@ double SphKernel::powerH(const double h, const int d)
     }
 }
 
-CubicSplineKernel::CubicSplineKernel(const int d) : dims(d)
+SphKernels::CubicSplineKernel::CubicSplineKernel(const int d) : dims(d)
 {
     description = "Cubic Spline";
 }
 
-double CubicSplineKernel::W(const double r, const double h)
+double SphKernels::CubicSplineKernel::W(const double r, const double h)
 {
     const double q = r/h;
     double result = normalFactors[dims-1] / powerH(h, dims);
@@ -46,20 +46,18 @@ double CubicSplineKernel::W(const double r, const double h)
     }
 }
 
-double CubicSplineKernel::gradWComponent(const double xi,
-                                         const double xj,
-                                         const double r,
-                                         const double h)
+double SphKernels::CubicSplineKernel::gradWComponent(const double xi, const double xj,
+                                                     const double r, const double h)
 {
     return (r > 1e-12) ? delW(r, h) * (xi - xj) / (r * h) : 0;
 }
 
-inline double CubicSplineKernel::getSupportRadius(const double h)
+inline double SphKernels::CubicSplineKernel::getSupportRadius(const double h)
 {
     return 2 * h;
 }
 
-double CubicSplineKernel::delW(const double r, const double h)
+double SphKernels::CubicSplineKernel::delW(const double r, const double h)
 {
     if (r < 1e-12) { return 0; }
 
@@ -80,7 +78,7 @@ double CubicSplineKernel::delW(const double r, const double h)
     }
 }
 
-void CubicSplineKernel::plotKernel(const double h)
+void SphKernels::CubicSplineKernel::plotKernel(const double h)
 {
     std::cout << "h=" << h << '\n';
     std::cout << "q," << "W," << "dW" << '\n';
