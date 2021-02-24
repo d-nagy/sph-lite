@@ -16,7 +16,7 @@ namespace SphSchemes
             double pressure, density, energyPerMass, energyPerMassDerivative;
             std::vector<int> neighbours;
             std::vector<double> neighbourDist;
-            unsigned int gridCellNo;
+            int gridCellNo;
     };
 }
 

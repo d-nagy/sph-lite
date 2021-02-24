@@ -41,9 +41,9 @@ void SimOutput::VTKResultsWriter::writeSnapshot(const std::vector<SphSchemes::Pa
     // Output particle positions
     for (auto &p : ps)
     {
-        for (int d=0; d<3; d++)
+        for (const auto xi : p.x)
         {
-            out << p.x[d] << " ";
+            out << xi << " ";
         }
     }
 

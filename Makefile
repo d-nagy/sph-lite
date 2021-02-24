@@ -1,6 +1,6 @@
 IDIR=include
 
-CXX=clang++
+CXX=/usr/bin/clang++
 CXXFLAGS=-I$(IDIR) -std=c++2a -Wall -Wextra -Wpedantic
 
 SDIR=src
@@ -18,13 +18,13 @@ DEPS=$(patsubst %,$(IDIR)/%,$(_DEPS))
 EXE=sph-lite.exe
 DBGEXE=sph-lite.exe.debug
 
-all: release
+all: serial
 
-release: CXXFLAGS += -O3
-release: clean $(EXE)
+serial: CXXFLAGS += -O3
+serial: clean $(EXE)
 
 parallel: CXXFLAGS += -fopenmp
-parallel: clean release
+parallel: clean serial
 
 debug: CXXFLAGS += -g
 debug: clean $(DBGEXE)

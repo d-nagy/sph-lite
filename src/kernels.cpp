@@ -7,7 +7,7 @@ std::ostream& SphKernels::operator<<(std::ostream &out, const SphKernels::SphKer
     return out;
 }
 
-double SphKernels::SphKernel::powerH(const double h, const int d)
+double SphKernels::SphKernel::powerH(const double h, const int d) const
 {
     double result = h;
     switch (d)
@@ -27,7 +27,7 @@ SphKernels::CubicSplineKernel::CubicSplineKernel(const int d) : dims(d)
     description = "Cubic Spline";
 }
 
-double SphKernels::CubicSplineKernel::W(const double r, const double h)
+double SphKernels::CubicSplineKernel::W(const double r, const double h) const
 {
     const double q = r/h;
     double result = normalFactors[dims-1] / powerH(h, dims);
@@ -47,17 +47,17 @@ double SphKernels::CubicSplineKernel::W(const double r, const double h)
 }
 
 double SphKernels::CubicSplineKernel::gradWComponent(const double xi, const double xj,
-                                                     const double r, const double h)
+                                                     const double r, const double h) const
 {
     return (r > 1e-12) ? delW(r, h) * (xi - xj) / (r * h) : 0;
 }
 
-inline double SphKernels::CubicSplineKernel::getSupportRadius(const double h)
+inline double SphKernels::CubicSplineKernel::getSupportRadius(const double h) const
 {
     return 2 * h;
 }
 
-double SphKernels::CubicSplineKernel::delW(const double r, const double h)
+double SphKernels::CubicSplineKernel::delW(const double r, const double h) const
 {
     if (r < 1e-12) { return 0; }
 
@@ -78,7 +78,7 @@ double SphKernels::CubicSplineKernel::delW(const double r, const double h)
     }
 }
 
-void SphKernels::CubicSplineKernel::plotKernel(const double h)
+void SphKernels::CubicSplineKernel::plotKernel(const double h) const
 {
     std::cout << "h=" << h << '\n';
     std::cout << "q," << "W," << "dW" << '\n';

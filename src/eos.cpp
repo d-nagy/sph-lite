@@ -15,7 +15,7 @@ SphEOS::WeaklyCompressibleEOS::WeaklyCompressibleEOS(const double k, const doubl
     description = "Weakly Compressible";
 }
 
-double SphEOS::WeaklyCompressibleEOS::getPressure(SphSchemes::Particle& p)
+double SphEOS::WeaklyCompressibleEOS::getPressure(SphSchemes::Particle& p) const
 {
     return k * (pow((p.density/rho0), 7) - 1);
 }
@@ -25,7 +25,7 @@ SphEOS::IdealGasEOS::IdealGasEOS(const double gamma) : gamma(gamma)
     description = "Ideal Gas";
 }
 
-double SphEOS::IdealGasEOS::getPressure(SphSchemes::Particle& p)
+double SphEOS::IdealGasEOS::getPressure(SphSchemes::Particle& p) const
 {
     return p.density * p.energyPerMass * (gamma - 1);
 }

@@ -1,16 +1,16 @@
-2               # Dimensions
-1000            # Rest density
-4               # Dynamic viscosity (kg/ms)
+2               # Dimensions (2D or 3D)
+1000            # Rest density (kg/m^3) of fluid
+4               # Dynamic viscosity (kg/ms) of fluid
 -9.81           # External gravitational acceleration
 0.01            # Fluid particle size / spacing (m)
 0.01            # Boundary particle size / spacing (m)
-0.02            # Smoothing length (m)
-cubicspline     # SPH kernel
-destructive     # Boundary handling
-wcsph           # SPH scheme
-0.2             # Maximum height of fluid
-0.01            # Allowed density variation
-0.00001         # Timestep (s)
+0.02            # Kernel smoothing length (m)
+cubicspline     # SPH kernel (only cubicspline for now)
+destructive     # Boundary handling [destructive, periodic]
+wcsph           # SPH scheme [wcsph, thermosph]
+0.2             # Maximum height of fluid (wcsph specific)
+0.01            # Allowed density variation as fraction (wcsph specific)
+0.00001         # Initial timestep size (s)
 0.000001         # Minimum timestep size
 0.001           # Maximum timestep size
 0.4             # CFL lambda multiplier

@@ -11,183 +11,181 @@
 #include <string>
 #include <iomanip>
 #include <sstream>
+#include <memory>
 #include <stdlib.h>
 
-const std::string caseDir = "./cases/";
-const std::string outputDir = "./output/";
-std::string casefileName;
-
-double t, tFinal, tPlot, deltaT, minDeltaT, maxDeltaT, deltaTPlot, cflLambda, cflT;
-SphSchemes::SPH *sphSim;
-
-// Read and initialise all parameters from input file, with some validation.
-int readParameters(const std::string& paramfileName)
+namespace Simulation
 {
-    int dimensions;
-    double fpSize, bpSize;
-    double restDensity, dynamicViscosity, gravity, smoothingLength;
-    double adiabaticIndex, maxHeight, densityVariation;
-    SphSchemes::BoundaryConditions boundaryConditions;
-    SphKernels::SphKernel *kernel;
+    std::string casefileName;
 
-    std::string line, kernelString, bcString, schemeString;
-    std::ifstream paramFile (paramfileName);
-    std::stringstream linestream;
-
-    if (paramFile.is_open())
+    struct TimestepData
     {
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> dimensions;
-        if (dimensions < 1 || dimensions > 3)
-        {
-            std::cout << "ERROR: Invalid number of dimensions given: " << dimensions << '\n';
-            return 0;
-        }
+        double deltaT0;
+        double tFinal;
+        double deltaTPlot;
+        double minDeltaT;
+        double maxDeltaT;
+        double cflLambda;
+    } timestepData;
 
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> restDensity;
+    SphSchemes::SphParams sphParams;
+    std::unique_ptr<SphKernels::SphKernel> kernel;
+    std::unique_ptr<SphSchemes::SPH> sphSystem;
 
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> dynamicViscosity;
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> gravity;
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> fpSize;
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> bpSize;
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> smoothingLength;
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> kernelString;
-        if (kernelString.compare("cubicspline") == 0)
-        {
-            kernel = new SphKernels::CubicSplineKernel(dimensions);
-        }
-        else
-        {
-            std::cout << "ERROR: Unknown kernel specified: \"" << kernelString << "\"" << '\n';
-            return 0;
-        }
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> bcString;
-        if (bcString.compare("periodic") == 0)
-        {
-            boundaryConditions = SphSchemes::BoundaryConditions::periodic;
-        }
-        else if (bcString.compare("destructive") == 0)
-        {
-            boundaryConditions = SphSchemes::BoundaryConditions::destructive;
-        }
-        else
-        {
-            std::cout << "ERROR: Unknown boundary conditions specified: \"" << bcString << "\"" << '\n';
-            return 0;
-        }
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> schemeString;
-        if (schemeString.compare("wcsph") == 0)
-        {
-            std::getline(paramFile, line);
-            linestream.str(line);
-            linestream >> maxHeight;
-
-            std::getline(paramFile, line);
-            linestream.str(line);
-            linestream >> densityVariation;
-
-            sphSim = new SphSchemes::WCSPH(dimensions,
-                                           restDensity,
-                                           dynamicViscosity,
-                                           gravity,
-                                           kernel,
-                                           fpSize,
-                                           bpSize,
-                                           smoothingLength,
-                                           boundaryConditions,
-                                           maxHeight,
-                                           densityVariation);
-        }
-        else if (schemeString.compare("thermosph") == 0)
-        {
-            std::getline(paramFile, line);
-            linestream.str(line);
-            linestream >> adiabaticIndex;
-
-            sphSim = new SphSchemes::ThermoSPH(dimensions,
-                                               restDensity,
-                                               dynamicViscosity,
-                                               gravity,
-                                               kernel,
-                                               fpSize,
-                                               bpSize,
-                                               smoothingLength,
-                                               boundaryConditions,
-                                               adiabaticIndex);
-        }
-        else
-        {
-            std::cout << "ERROR: Unknown SPH scheme specified: \"" << schemeString << "\"" << '\n';
-            return 0;
-        }
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> deltaT;
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> minDeltaT;
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> maxDeltaT;
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> cflLambda;
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> deltaTPlot;
-
-        std::getline(paramFile, line);
-        linestream.str(line);
-        linestream >> tFinal;
-
-        std::getline(paramFile, line);
-        casefileName = line;
-
-        paramFile.close();
-        std::cout << "All parameters read successfully." << '\n';
-        return 1;
-    }
-    else
+    // Read and initialise all parameters from input file, with some validation.
+    int configureSimulation(const std::string& paramfileName)
     {
-        std::cout << "ERROR: Unable to open parameters file." << '\n';
-        return 0;
+        double adiabaticIndex, maxHeight, densityVariation;
+
+        std::string line, kernelString, bcString, schemeString;
+        std::ifstream paramFile (paramfileName);
+        std::stringstream linestream;
+
+        if (paramFile.is_open())
+        {
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> sphParams.dimensions;
+            if (sphParams.dimensions < 1 || sphParams.dimensions > 3)
+            {
+                std::cout << "ERROR: Invalid number of dimensions given: " << sphParams.dimensions << '\n';
+                return 0;
+            }
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> sphParams.restDensity;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> sphParams.dynamicViscosity;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> sphParams.gravity;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> sphParams.fpSize;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> sphParams.bpSize;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> sphParams.smoothingLength;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> kernelString;
+            if (kernelString.compare("cubicspline") == 0)
+            {
+                kernel = std::make_unique<SphKernels::CubicSplineKernel>(sphParams.dimensions);
+            }
+            else
+            {
+                std::cout << "ERROR: Unknown kernel specified: \"" << kernelString << "\"" << '\n';
+                return 0;
+            }
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> bcString;
+            if (bcString.compare("periodic") == 0)
+            {
+                sphParams.boundaryConditions = SphSchemes::BoundaryConditions::periodic;
+            }
+            else if (bcString.compare("destructive") == 0)
+            {
+                sphParams.boundaryConditions = SphSchemes::BoundaryConditions::destructive;
+            }
+            else
+            {
+                std::cout << "ERROR: Unknown boundary conditions specified: \"" << bcString << "\"" << '\n';
+                return 0;
+            }
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> schemeString;
+            if (schemeString.compare("wcsph") == 0)
+            {
+                std::getline(paramFile, line);
+                linestream.str(line);
+                linestream >> maxHeight;
+
+                std::getline(paramFile, line);
+                linestream.str(line);
+                linestream >> densityVariation;
+
+                sphSystem = std::make_unique<SphSchemes::WCSPH>(sphParams,
+                                                                std::move(kernel),
+                                                                maxHeight,
+                                                                densityVariation);
+            }
+            else if (schemeString.compare("thermosph") == 0)
+            {
+                std::getline(paramFile, line);
+                linestream.str(line);
+                linestream >> adiabaticIndex;
+
+                sphSystem = std::make_unique<SphSchemes::ThermoSPH>(sphParams,
+                                                                    std::move(kernel),
+                                                                    adiabaticIndex);
+            }
+            else
+            {
+                std::cout << "ERROR: Unknown SPH scheme specified: \"" << schemeString << "\"" << '\n';
+                return 0;
+            }
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> timestepData.deltaT0;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> timestepData.minDeltaT;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> timestepData.maxDeltaT;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> timestepData.cflLambda;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> timestepData.deltaTPlot;
+
+            std::getline(paramFile, line);
+            linestream.str(line);
+            linestream >> timestepData.tFinal;
+
+            std::getline(paramFile, line);
+            casefileName = line;
+
+            paramFile.close();
+            std::cout << "All parameters read successfully." << '\n';
+            return 1;
+        }
+        else
+        {
+            std::cout << "ERROR: Unable to open parameters file." << '\n';
+            return 0;
+        }
     }
 }
 
 int main(int argc, char** argv)
 {
-    std::string paramfileName;
+    using Simulation::sphSystem;
+    using Simulation::timestepData;
+
+    const std::string caseDir = "./cases/";
+    const std::string outputDir = "./output/";
 
     if (argc < 2)
     {
@@ -195,62 +193,63 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (readParameters(argv[1]) == 0) return 1;
+    if (Simulation::configureSimulation(argv[1]) == 0) return 1;
 
     SimOutput::VTKResultsWriter vtkout(outputDir);
 
-    sphSim->printParameters();
+    sphSystem->printParameters();
     std::cout << '\n' << "SIMULATION PARAMETERS:" << '\n'
-              << "\tInitial timestep:       " << deltaT << '\n'
-              << "\tMinimum timestep:       " << minDeltaT << '\n'
-              << "\tMaximum timestep:       " << maxDeltaT << '\n'
-              << "\tCFL multiplier:         " << cflLambda << '\n'
-              << "\tPlot interval:          " << deltaTPlot << '\n'
-              << "\tFinal time:             " << tFinal << '\n'
-              << "\tCase file:              " << casefileName << '\n';
+              << "\tInitial timestep:       " << timestepData.deltaT0 << '\n'
+              << "\tMinimum timestep:       " << timestepData.minDeltaT << '\n'
+              << "\tMaximum timestep:       " << timestepData.maxDeltaT << '\n'
+              << "\tCFL multiplier:         " << timestepData.cflLambda << '\n'
+              << "\tPlot interval:          " << timestepData.deltaTPlot << '\n'
+              << "\tFinal time:             " << timestepData.tFinal << '\n'
+              << "\tCase file:              " << Simulation::casefileName << '\n';
 
-    t = 0.0;
-    tPlot = t + deltaTPlot;
+    double t = 0.0;
+    double tPlot = t + timestepData.deltaTPlot;
+    double deltaT = timestepData.deltaT0;
 
-    sphSim->initialiseParticles(caseDir + casefileName);
+    sphSystem->initialiseParticles(caseDir + Simulation::casefileName);
 
-    sphSim->setupParticleGrid();
-    sphSim->calcParticleDensities();
+    sphSystem->setupParticleGrid();
+    sphSystem->calcParticleDensities();
 
     // Plot initial state
-    vtkout.writeSnapshot(sphSim->particles);
+    vtkout.writeSnapshot(sphSystem->particles);
     std::cout << '\n' << "Time: " << t << "\t"
-              << "max speed: " << sqrt(sphSim->maxSpeedSquared) << '\n';
+              << "max speed: " << sqrt(sphSystem->maxSpeedSquared) << '\n';
 
-    while (t <= tFinal)
+    while (t <= timestepData.tFinal)
     {
-        sphSim->setupParticleGrid();
-        sphSim->calcParticleDensities();
-        sphSim->calcParticleForces();
-        sphSim->stepParticles(deltaT);
+        sphSystem->setupParticleGrid();
+        sphSystem->calcParticleDensities();
+        sphSystem->calcParticleForces();
+        sphSystem->stepParticles(deltaT);
 
-        if (deltaTPlot > 0 && t >= tPlot)
+        if (timestepData.deltaTPlot > 0 && t >= tPlot)
         {
             // Plot state of the system
-            vtkout.writeSnapshot(sphSim->particles);
+            vtkout.writeSnapshot(sphSystem->particles);
             std::cout << "Time: " << t << "\t"
-                      << "max speed: " << sqrt(sphSim->maxSpeedSquared) << '\n';
-            tPlot += deltaTPlot;
+                      << "max speed: " << sqrt(sphSystem->maxSpeedSquared) << '\n';
+            tPlot += timestepData.deltaTPlot;
         }
         t += deltaT;
 
-        cflT = sphSim->getCFLTimestep(cflLambda);
-        if (deltaTPlot > 0)
+        double cflT = sphSystem->getCFLTimestep(timestepData.cflLambda);
+        if (timestepData.deltaTPlot > 0)
         {
             deltaT = (tPlot - t < cflT) ? tPlot - t : cflT;
         }
-        deltaT = (deltaT < minDeltaT) ? minDeltaT : (maxDeltaT > deltaT) ? maxDeltaT : deltaT;
+        deltaT = (deltaT < timestepData.minDeltaT) ? timestepData.minDeltaT :
+                 (timestepData.maxDeltaT > deltaT) ? timestepData.maxDeltaT : deltaT;
     }
 
     // Plot final state of the system
-    vtkout.writeSnapshot(sphSim->particles);
+    vtkout.writeSnapshot(sphSystem->particles);
     std::cout << "Time: " << t << "\t"
-              << "max speed: " << sqrt(sphSim->maxSpeedSquared) << '\n';
+              << "max speed: " << sqrt(sphSystem->maxSpeedSquared) << '\n';
 
-    delete sphSim;
 }

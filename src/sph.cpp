@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <vector>
+#include <array>
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -20,14 +21,14 @@ using SphSchemes::Particle;
 // and particle pressures using state equation.
 void SphSchemes::SPH::calcParticleDensities()
 {
-    int origin[3];
+    std::array<int, 3> origin;
+    std::array<double, 3> nbrPositionOffset;
     const double nbrRadius = kernel->getSupportRadius(smoothingLength);
-    double nbrPositionOffset[3];
 
-    const int nMax = particles.size();
+    const auto nMax = particles.size();
 
     // #pragma omp parallel for
-    for (int n=numBoundaryParticles; n<nMax; ++n)
+    for (std::size_t n=numBoundaryParticles; n<nMax; ++n)
     {
         Particle &op = particles[n];
 
@@ -128,10 +129,10 @@ void SphSchemes::SPH::calcParticleDensities()
 // is computed using the symmetric SPH formula.
 void SphSchemes::SPH::calcParticleForces()
 {
-    const int nMax = particles.size();
+    const auto nMax = particles.size();
 
     #pragma omp parallel for
-    for (int n=numBoundaryParticles; n<nMax; ++n)
+    for (std::size_t n=numBoundaryParticles; n<nMax; ++n)
     {
         Particle &op = particles[n];
 
@@ -181,10 +182,10 @@ void SphSchemes::SPH::calcParticleForces()
 // Semi-implicit Euler scheme
 void SphSchemes::SPH::stepParticles(const double dt)
 {
-    const int nMax = particles.size();
+    const auto nMax = particles.size();
 
     #pragma omp parallel for
-    for (int n=numBoundaryParticles; n<nMax; ++n)
+    for (std::size_t n=numBoundaryParticles; n<nMax; ++n)
     {
         Particle &op = particles[n];
 
@@ -257,7 +258,7 @@ void SphSchemes::SPH::stepParticles(const double dt)
     {
         particles.erase(std::remove_if(particles.begin(),
                                        particles.end(),
-                                       [](const Particle& p){return !p.isActive;}),
+                                       [](const auto& p){ return !p.isActive; }),
                     particles.end());
     }
 }
@@ -282,7 +283,7 @@ void SphSchemes::SPH::setupParticleGrid()
 // Initialise all particle positions and densities.
 int SphSchemes::SPH::initialiseParticles(const std::string& casefileName)
 {
-    int numFluidParticles, numParticles = 0;
+    std::size_t numFluidParticles, numParticles = 0;
 
     std::ifstream caseFile (casefileName);
     std::string line;
@@ -311,7 +312,7 @@ int SphSchemes::SPH::initialiseParticles(const std::string& casefileName)
         linestream >> domainMax[0] >> domainMax[1] >> domainMax[2];
 
         // Initialise particles and set positions
-        for (int p=0; p<numParticles; ++p)
+        for (std::size_t p=0; p<numParticles; ++p)
         {
             Particle op = Particle();
             op.isBoundary = (p < numBoundaryParticles);
@@ -324,19 +325,11 @@ int SphSchemes::SPH::initialiseParticles(const std::string& casefileName)
             {
                 linestream >> op.x[d];
 
-                if (p == 0)
-                {
+                if (op.x[d] < minPosition[d])
                     minPosition[d] = op.x[d];
-                    maxPosition[d] = op.x[d];
-                }
-                else
-                {
-                    if (op.x[d] < minPosition[d])
-                        minPosition[d] = op.x[d];
 
-                    if (op.x[d] > maxPosition[d])
-                        maxPosition[d] = op.x[d];
-                }
+                if (op.x[d] > maxPosition[d])
+                    maxPosition[d] = op.x[d];
             }
 
             linestream >> op.isBoundary;
@@ -372,7 +365,7 @@ void SphSchemes::SPH::initCoordOffsetArray()
     {
         for (int d=0; d<dimensions; ++d)
         {
-            const int power = pow(3, dimensions-d-1);
+            const int power = static_cast<int>(pow(3, dimensions-d-1));
             coordOffsets.at(coordOffsetsIndex(i, d, dimensions)) = ((i / power) % 3) - 1;
         }
     }
@@ -387,7 +380,7 @@ void SphSchemes::SPH::resizeGrid()
 
     for (int d=0; d<dimensions; ++d)
     {
-        int dim = ceil((maxPosition[d] - minPosition[d] + fluidParticleSize) / cellSize);
+        const int dim = static_cast<int>(ceil((maxPosition[d] - minPosition[d] + fluidParticleSize) / cellSize));
         if (gridDims[d] != dim) { needToResize = true; }
         gridSize *= dim;
         gridDims[d] = dim;
@@ -434,10 +427,10 @@ void SphSchemes::SPH::printParameters()
     switch (boundaryConditions)
     {
         case BoundaryConditions::periodic:
-            bcString = "BoundaryConditions::periodic";
+            bcString = "periodic";
             break;
         case BoundaryConditions::destructive:
-            bcString = "BoundaryConditions::destructive";
+            bcString = "destructive";
             break;
     }
 
@@ -474,78 +467,45 @@ void SphSchemes::ThermoSPH::printParameters()
               << "\tAdiabatic index:        " << adiabaticIndex << '\n';
 }
 
-SphSchemes::SPH::SPH(
-        int d,
-        double rho0,
-        double eta,
-        double g,
-        SphKernels::SphKernel *kernel,
-        double fluidSpacing,
-        double boundarySpacing,
-        double h,
-        BoundaryConditions bc
-    )
+SphSchemes::SPH::SPH(SphSchemes::SphParams params, std::unique_ptr<SphKernels::SphKernel> kernel)
 {
-    dimensions = d;
-    restDensity = rho0;
-    dynamicViscosity = eta;
-    extGravity = g;
-    this->kernel = kernel;
-    fluidParticleSize = fluidSpacing;
-    boundaryParticleSize = boundarySpacing;
-    smoothingLength = h;
-    boundaryConditions = bc;
+    dimensions = params.dimensions;
+    restDensity = params.restDensity;
+    dynamicViscosity = params.dynamicViscosity;
+    extGravity = params.gravity;
+    this->kernel = std::move(kernel);
+    fluidParticleSize = params.fpSize;
+    boundaryParticleSize = params.bpSize;
+    smoothingLength = params.smoothingLength;
+    boundaryConditions = params.boundaryConditions;
 
-    gridNbrhoodSize = pow(3, dimensions);
+    gridNbrhoodSize = static_cast<int>(pow(3, dimensions));
     fluidParticleMass = restDensity * pow(fluidParticleSize, dimensions);
     boundaryParticleMass = restDensity * pow(boundaryParticleSize, dimensions);
 
     initCoordOffsetArray();
 }
 
-SphSchemes::WCSPH::WCSPH(
-        int d,
-        double rho0,
-        double eta,
-        double g,
-        SphKernels::SphKernel *kernel,
-        double fluidSpacing,
-        double boundarySpacing,
-        double h,
-        BoundaryConditions bc,
-        double maxH,
-        double rhoVar
-    ) : SPH(d, rho0, eta, g, kernel, fluidSpacing, boundarySpacing, h, bc)
+SphSchemes::WCSPH::WCSPH(SphSchemes::SphParams params,
+                         std::unique_ptr<SphKernels::SphKernel> kernel,
+                         double maxH,
+                         double rhoVar
+                         ) : SPH(params, std::move(kernel))
 {
-    boundaryConditions = bc;
     densityVariation = rhoVar;
 
-    double soundSpeedSquared = 2 * abs(g) * maxH / rhoVar;
-    pressureConstant = rho0 * soundSpeedSquared / 7;
+    const double soundSpeedSquared = 2 * abs(extGravity) * maxH / densityVariation;
+    pressureConstant = restDensity * soundSpeedSquared / 7;
     soundSpeed = sqrt(soundSpeedSquared);
 
-    eos = std::make_unique<SphEOS::WeaklyCompressibleEOS>(pressureConstant, rho0);
+    eos = std::make_unique<SphEOS::WeaklyCompressibleEOS>(pressureConstant, restDensity);
 }
 
-SphSchemes::ThermoSPH::ThermoSPH(
-        int d,
-        double rho0,
-        double eta,
-        double g,
-        SphKernels::SphKernel *kernel,
-        double fluidSpacing,
-        double boundarySpacing,
-        double h,
-        BoundaryConditions bc,
-        double gamma
-    ) : SPH(d, rho0, eta, g, kernel, fluidSpacing, boundarySpacing, h, bc)
+SphSchemes::ThermoSPH::ThermoSPH(SphSchemes::SphParams params,
+                                 std::unique_ptr<SphKernels::SphKernel> kernel,
+                                 double gamma
+                                 ) : SPH(params, std::move(kernel))
 {
     adiabaticIndex = gamma;
-
-    eos = std::make_unique<SphEOS::IdealGasEOS>(gamma);
-}
-
-SphSchemes::SPH::~SPH()
-{
-    delete kernel;
+    eos = std::make_unique<SphEOS::IdealGasEOS>(adiabaticIndex);
 }

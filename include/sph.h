@@ -7,6 +7,7 @@
 #include "kernels.h"
 
 #include <vector>
+#include <array>
 #include <string>
 #include <memory>
 
@@ -16,6 +17,18 @@ namespace SphSchemes
     {
         destructive,
         periodic
+    };
+
+    struct SphParams
+    {
+        int dimensions;
+        double fpSize;
+        double bpSize;
+        double restDensity;
+        double dynamicViscosity;
+        double gravity;
+        double smoothingLength;
+        SphSchemes::BoundaryConditions boundaryConditions;
     };
 
     class SPH
@@ -30,16 +43,7 @@ namespace SphSchemes
             virtual void calcParticleForces();
             virtual void stepParticles(const double dt);
             virtual void printParameters();
-            SPH(int d,
-                double rho0,
-                double eta,
-                double g,
-                SphKernels::SphKernel *kernel,
-                double fluidSpacing,
-                double boundarySpacing,
-                double h,
-                BoundaryConditions bc);
-            virtual ~SPH();
+            virtual ~SPH() {};
 
         protected:
             int dimensions;
@@ -48,23 +52,34 @@ namespace SphSchemes
             double dynamicViscosity;
             double extGravity;
             std::unique_ptr<SphEOS::EquationOfState> eos;
-            SphKernels::SphKernel *kernel;
+            std::unique_ptr<SphKernels::SphKernel> kernel;
             double fluidParticleSize;
             double boundaryParticleSize;
-            double smoothingLength;
             double fluidParticleMass;
             double boundaryParticleMass;
+            double smoothingLength;
             std::vector<int> coordOffsets;
-            int gridDims[3];
+            std::array<int, 3> gridDims;
+            std::array<int, 3> dimFactors;
             int gridNbrhoodSize;
-            int dimFactors[3];
-            double minPosition[3];
-            double maxPosition[3];
-            double domainMin[3];
-            double domainMax[3];
-            int numBoundaryParticles;
+            std::array<double, 3> minPosition{
+                std::numeric_limits<double>::max(),
+                std::numeric_limits<double>::max(),
+                std::numeric_limits<double>::max()
+                };
+            std::array<double, 3> maxPosition{
+                std::numeric_limits<double>::min(),
+                std::numeric_limits<double>::min(),
+                std::numeric_limits<double>::min()
+                };
+            std::array<double, 3> domainMin;
+            std::array<double, 3> domainMax;
+            std::size_t numBoundaryParticles;
             BoundaryConditions boundaryConditions;
             std::vector<std::vector<int>> grid;
+            SPH(SphParams params, std::unique_ptr<SphKernels::SphKernel> kernel);
+
+        private:
             void initCoordOffsetArray();
             void resizeGrid();
             void projectParticlesToGrid();
@@ -73,19 +88,12 @@ namespace SphSchemes
     class WCSPH: public SPH
     {
         public:
-            void printParameters();
-            double getCFLTimestep(const double multiplier);
-            WCSPH(int d,
-                double rho0,
-                double eta,
-                double g,
-                SphKernels::SphKernel *kernel,
-                double fluidSpacing,
-                double boundarySpacing,
-                double h,
-                BoundaryConditions bc,
-                double maxH,
-                double rhoVar);
+            void printParameters() override;
+            double getCFLTimestep(const double multiplier) override;
+            WCSPH(SphParams params,
+                  std::unique_ptr<SphKernels::SphKernel> kernel,
+                  double maxH,
+                  double rhoVar);
 
         private:
             double densityVariation;
@@ -95,17 +103,10 @@ namespace SphSchemes
     class ThermoSPH: public SPH
     {
         public:
-            void printParameters();
-            ThermoSPH(int d,
-                    double rho0,
-                    double eta,
-                    double g,
-                    SphKernels::SphKernel *kernel,
-                    double fluidSpacing,
-                    double boundarySpacing,
-                    double h,
-                    BoundaryConditions bc,
-                    double gamma);
+            void printParameters() override;
+            ThermoSPH(SphParams params,
+                      std::unique_ptr<SphKernels::SphKernel> kernel,
+                      double gamma);
 
         private:
             double adiabaticIndex;
