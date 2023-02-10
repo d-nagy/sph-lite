@@ -1,5 +1,7 @@
 # sph-lite
 
+<img src="https://user-images.githubusercontent.com/36937255/218095895-bb5309bc-568e-4bbe-a1c8-b062d4c605b9.png" height="500">
+
 sph-lite is Phase I of my master's level project with Tobias Weinzierl, "Mini-SPH".
 
 The aim of Phase I is to develop a very simple test-bed SPH code that can be later integrated into the HPC software [Peano](http://www.peano-framework.org/index.php/peano-v-3/).
